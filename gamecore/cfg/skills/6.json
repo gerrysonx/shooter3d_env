@@ -1,0 +1,8 @@
+{
+    "name" : "JumpTowardsEnemy",
+    "desc" : "jump off enemies.",
+    "life" : 5,
+    "type" : 0,
+    "cd" : 10,
+    "val1" : 3
+}

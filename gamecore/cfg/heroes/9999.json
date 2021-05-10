@@ -1,0 +1,13 @@
+{
+	"name" : "static",
+	"attackFreq" : 1,
+	"attackRange" : 20,
+	"viewRange" : 2000,
+	"health" : 1000,
+	"damage" : 0,
+	"speed" : 0,
+    "size" : 20,
+	"skills" : [],
+    "extent" : [20, 20, 20],
+    "texture" : "map/3_corridors.png"
+}

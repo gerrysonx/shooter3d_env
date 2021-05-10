@@ -1,0 +1,13 @@
+{
+	"name" : "vi",
+	"attackFreq" : 1,
+	"attackRange" : 60,
+	"viewRange" : 2000,
+	"health" : 300,
+	"damage" : 50,
+	"speed" : 400,
+    "size" : 10,
+	"skills" : [2, 3, 4, -1],
+    "extent" : [20, 20, 20],
+    "texture" : "map/3_corridors.png"
+}

@@ -1,0 +1,13 @@
+{
+	"name" : "lusian",
+	"attackFreq" : 1,
+	"attackRange" : 20,
+	"viewRange" : 2000,
+	"health" : 2000,
+	"damage" : 100,
+	"speed" : 500,
+    "size" : 10,
+	"skills" : [-1, -1, -1, -1],
+    "extent" : [20, 20, 80],
+    "texture" : "map/3_corridors.png"
+}

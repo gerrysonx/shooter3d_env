@@ -1,0 +1,11 @@
+{
+	"name" : "bullet",	
+	"attackFreq" : 0.2,
+	"attackRange" : 5,
+	"health" : 600,
+	"damage" : 50,
+	"speed" : 500,
+    "size" : 5,
+    "extent" : [5, 5, 5],
+    "texture" : "map/bullet.png"
+}

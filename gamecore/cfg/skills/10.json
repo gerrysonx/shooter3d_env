@@ -1,0 +1,8 @@
+{
+    "name" : "ambush",
+    "desc" : "stay invisible for specified time.",
+    "life" : 5,
+    "type" : 3,
+    "cd" : 10,
+    "val1" : 3
+}
