@@ -3,6 +3,7 @@
 	"attackFreq" : 1,
 	"attackRange" : 20,
 	"viewRange" : 2000,
+    "fov" : 60,
 	"health" : 1000,
 	"damage" : 0,
 	"speed" : 0,

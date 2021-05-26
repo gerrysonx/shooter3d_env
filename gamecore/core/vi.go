@@ -8,8 +8,39 @@ type Vi struct {
 	Hero
 }
 
+func (hero *Vi) HandleAICommand(gap_time float64) {
+	pos := hero.Position()
+	// Check milestone distance
+	targetPos := hero.TargetPos()
+	// Todo: remain z value
+	targetPos[2] = pos[2]
+
+	dist := vec3.Distance(&pos, &targetPos)
+
+	pos_ready := false
+	if dist < 5 {
+		// Already the last milestone
+		pos_ready = true
+	}
+
+	isEnemyNearby, enemy := CheckEnemyInFrustum(hero.Camp(), hero)
+	if isEnemyNearby {
+		// Check if time to make hurt
+		NormalAttackEnemy(hero, enemy)
+	} else {
+		if !pos_ready {
+
+			Chase(hero, targetPos, gap_time)
+		}
+
+	}
+}
+
 func (hero *Vi) Tick(gap_time float64) {
+	// Used for AI control
 	game := &GameInst
+	hero.HandleAICommand(gap_time)
+	//	hero.ManualCtrl(gap_time)
 	return
 
 	if game.ManualCtrlEnemy {

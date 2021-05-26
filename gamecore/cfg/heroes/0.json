@@ -1,11 +1,12 @@
 {
 	"name" : "bullet",	
-	"attackFreq" : 0.2,
-	"attackRange" : 5,
+	"attackFreq" : 10,
+	"attackRange" : 20,
+    "fov" : 60,
 	"health" : 600,
 	"damage" : 50,
-	"speed" : 500,
+	"speed" : 200,
     "size" : 5,
-    "extent" : [5, 5, 5],
+    "extent" : [5, 5, 80],
     "texture" : "map/bullet.png"
 }

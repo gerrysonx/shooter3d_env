@@ -37,6 +37,13 @@ type Hero struct {
 }
 
 func (baseinfo *Hero) SetTargetPos(x float32, y float32) {
+	/*
+		player_camp := baseinfo.Camp()
+		if player_camp == 0 {
+			LogStr(fmt.Sprintf("SetTargetPos camp:%v move is called, target pos from (%v, %v) to (%v, %v)",
+				player_camp, baseinfo.targetpos[0], baseinfo.targetpos[1], x, y))
+		}
+	*/
 	baseinfo.targetpos[0] = x
 	baseinfo.targetpos[1] = y
 	baseinfo.targetpos[2] = baseinfo.position[2]
@@ -78,8 +85,6 @@ func (hero *Hero) CopyHero(src HeroFunc) {
 var hero_template Hero
 
 func (hero *Hero) ManualCtrl(gap_time float64) {
-	game := &GameInst
-
 	pos := hero.Position()
 	// Check milestone distance
 	targetPos := hero.TargetPos()
@@ -92,46 +97,15 @@ func (hero *Hero) ManualCtrl(gap_time float64) {
 		pos_ready = true
 	}
 
-	isEnemyNearby, enemy := CheckEnemyNearby(hero.Camp(), hero.AttackRange(), &pos)
+	isEnemyNearby, enemy := CheckEnemyInFrustum(hero.Camp(), hero)
 	if isEnemyNearby && pos_ready {
 		// Check if time to make hurt
-		now_seconds := game.LogicTime
-		if (hero.LastAttackTime() + hero.AttackFreq()) < float64(now_seconds) {
-			// Make damage
-			dir_a := enemy.Position()
-			dir_b := hero.Position()
-			dir := vec3.Sub(&dir_a, &dir_b)
-			bullet := new(Bullet).Init(hero.Camp(), hero.Position(), dir, hero.Damage())
-			game.AddUnits = append(game.AddUnits, bullet)
-
-			hero.SetLastAttackTime(now_seconds)
-		}
+		NormalAttackEnemy(hero, enemy)
 	} else {
-
 		if pos_ready {
 			// Do nothing
-
 		} else {
-			// March towards target direction
-			dir := hero.Direction()
-			dir = dir.Scaled(float32(gap_time))
-			dir = dir.Scaled(float32(hero.speed))
-			newPos := vec3.Add(&pos, &dir)
-			within := false
-			for _, v := range game.BattleField.Props {
-				within = v.CheckWithin(newPos)
-				if within {
-					break
-				}
-			}
-			if !within {
-				hero.SetPosition(newPos)
-			}
-
-			// Calculate new direction
-			hero.direction = targetPos
-			hero.direction.Sub(&newPos)
-			hero.direction.Normalize()
+			Chase(hero, targetPos, gap_time)
 		}
 	}
 }
@@ -162,6 +136,7 @@ func (hero *Hero) InitFromJson(full_path string, id int32) bool {
 		hero.view_range = jsoninfo.ViewRange
 		hero.type_id = id
 		hero.name = jsoninfo.Name
+		hero.fov = jsoninfo.Fov
 
 		hero.extent[0] = jsoninfo.Extent[0]
 		hero.extent[1] = jsoninfo.Extent[1]

@@ -3,7 +3,10 @@ package render
 import (
 	"math"
 
+	"github.com/go-gl/mathgl/mgl32"
+
 	"../common"
+	"../core"
 	"github.com/ungerik/go3d/vec3"
 	"github.com/ungerik/go3d/vec4"
 )
@@ -18,9 +21,29 @@ func RotateVertWithQuat(vert []float32, rotation core.Vector4) {
 
 }
 */
+func GetFarFaceFourPoints(vertice []float32, view_frustum []vec3.T) {
+	offset := 90
+	view_frustum[0][0] = vertice[offset+25]
+	view_frustum[0][1] = vertice[offset+26]
+	view_frustum[0][2] = vertice[offset+27]
+
+	view_frustum[1][0] = vertice[offset+15]
+	view_frustum[1][1] = vertice[offset+16]
+	view_frustum[1][2] = vertice[offset+17]
+
+	view_frustum[2][0] = vertice[offset+5]
+	view_frustum[2][1] = vertice[offset+6]
+	view_frustum[2][2] = vertice[offset+7]
+
+	view_frustum[3][0] = vertice[offset+10]
+	view_frustum[3][1] = vertice[offset+11]
+	view_frustum[3][2] = vertice[offset+12]
+
+}
+
 func SetConeOffset(vertice []float32, x_new float32, y_new float32, z_new float32,
-	unit_width float32, unit_height float32, unit_depth float32) {
-	far_face_ratio := float32(40.0)
+	unit_width float32, unit_height float32, unit_depth float32, far_face_ratio float32) {
+	// far_face_ratio := float32(40.0)
 	// Bottom
 	offset := 0
 	vertice[offset+0] = x_new - unit_width
@@ -543,18 +566,23 @@ func UpdatePos(vertice []float32, pos vec3.T, extent vec3.T) {
 	SetOffset(vertice, x_new, y_new, z_new, unit_width, unit_height, unit_depth)
 }
 
-func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T) {
+func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T, f0 core.BaseFunc) {
+	cone_length, fov, view_frustum := f0.ViewRange(), f0.Fov(), f0.ViewFrustum()
 	dir.Normalize()
-	unit_width := float32(500) // x
-	unit_height := float32(10) // z
-	unit_depth := float32(10)  // y
+	unit_width := float32(cone_length / 2) // x
+	unit_height := float32(10)             // z
+	unit_depth := float32(10)              // y
 
-	ahead_dist := unit_width + 50
+	ahead_dist := unit_width
 	x_new := pos[0] + dir[0]*ahead_dist
 	y_new := pos[1] + dir[1]*ahead_dist
 	z_new := pos[2] + dir[2]*ahead_dist
 
-	SetConeOffset(vertice, 0, 0, 0, unit_width, unit_height, unit_depth)
+	tangent := float32(math.Tan(float64(mgl32.DegToRad(fov / 2))))
+	far_face_ratio := cone_length * tangent / unit_height
+
+	// near far face size ratio
+	SetConeOffset(vertice, 0, 0, 0, unit_width, unit_height, unit_depth, far_face_ratio)
 	// Calculate the rotation quaternion b = dir, b*a^-1
 	theta := math.Acos(float64(dir[0]))
 	if dir[1] < 0 {
@@ -585,4 +613,6 @@ func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T) {
 		quatTmp.GetVert(vertice[_idx*PointSize : _idx*PointSize+3])
 	}
 	OffsetObject(vertice, x_new, y_new, z_new, 0, 0, 0)
+
+	GetFarFaceFourPoints(vertice, view_frustum)
 }

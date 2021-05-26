@@ -55,13 +55,13 @@ func main() {
 	_run_render := flag.Bool("render", true, "a bool")
 	_input_gap_time := flag.Float64("input_gap", 0.2, "")
 	_manual_enemy := flag.Bool("manual_enemy", true, "a bool")
-	_gym_mode := flag.Bool("gym_mode", false, "a bool")
+	_gym_mode := flag.Bool("gym_mode", true, "a bool")
 	_debug_log := flag.Bool("debug_log", false, "a bool")
 	_slow_tick := flag.Bool("slow_tick", false, "a bool")
 	_multi_player := flag.Bool("multi_player", true, "a bool")
 	_scene_id := flag.Int("scene", 10, "a bool")
 
-	file_handle, _err := os.Create(fmt.Sprintf("%s/../mobacore.log", root_dir))
+	file_handle, _err := os.Create(fmt.Sprintf("%s/../shooter3d_core.log", root_dir))
 	if _err != nil {
 		fmt.Println("Create log file failed.")
 		return
@@ -185,7 +185,10 @@ func main() {
 			//	game_state_str := core.GameInst.DumpVarPlayerGameState()
 			// core.LogBytes(file_handle, game_state_str)
 			//	core.LogStr(fmt.Sprintf("BeforeTick, _action_stamp:%v, game_state_str:%s", core.GameInst.LogicTime, game_state_str))
-			core.GameInst.Tick(*_target_frame_gap_time)
+			if !core.GameInst.Paused {
+				core.GameInst.Tick(*_target_frame_gap_time)
+			}
+
 			//	game_state_str = core.GameInst.DumpVarPlayerGameState()
 			// core.LogBytes(file_handle, game_state_str)
 			//	core.LogStr(fmt.Sprintf("AfterTick, _action_stamp:%v, game_state_str:%s", core.GameInst.LogicTime, game_state_str))

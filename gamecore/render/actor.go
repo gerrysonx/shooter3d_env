@@ -3,12 +3,14 @@ package render
 import (
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
 
 	"../core"
 	"github.com/go-gl/gl/v4.1-core/gl"
+	"github.com/go-gl/mathgl/mgl32"
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -225,22 +227,35 @@ func (actor *Actor) Draw(f0 core.BaseFunc) {
 
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(actor._vert_count))
 
-	// Draw view pyramid
-	change_color = float32(0.1)
+	if core.GameInst.ShowFrustum {
+		// Draw view pyramid
+		if f0.GetId() > 0 {
+			if math.Abs(float64(dir[0])) > 1e-3 || math.Abs(float64(dir[1])) > 1e-3 {
 
-	gl.Uniform3f(colorUniform, change_color, change_color, 0.6)
+				change_color = float32(0.1)
 
-	UpdatePosDir(actor._vert_buffer, pos, dir)
+				gl.Uniform3f(colorUniform, change_color, change_color, 0.6)
 
-	gl.BindBuffer(gl.ARRAY_BUFFER, actor._vbo)
-	gl.BufferData(gl.ARRAY_BUFFER, int(actor._vert_buffer_size), gl.Ptr(actor._vert_buffer), gl.DYNAMIC_DRAW)
+				transparencyUniform := gl.GetUniformLocation(actor._renderer.program, gl.Str("transparency\x00"))
+				change_color := float32(0.3)
+				gl.Uniform1f(transparencyUniform, change_color)
 
-	gl.BindVertexArray(actor._vao)
+				UpdatePosDir(actor._vert_buffer, pos, dir, f0)
 
-	gl.ActiveTexture(gl.TEXTURE0)
-	gl.BindTexture(gl.TEXTURE_2D, actor._tex)
+				gl.BindBuffer(gl.ARRAY_BUFFER, actor._vbo)
+				gl.BufferData(gl.ARRAY_BUFFER, int(actor._vert_buffer_size), gl.Ptr(actor._vert_buffer), gl.DYNAMIC_DRAW)
 
-	gl.DrawArrays(gl.TRIANGLES, 0, int32(actor._vert_count))
+				gl.BindVertexArray(actor._vao)
+
+				gl.ActiveTexture(gl.TEXTURE0)
+				gl.BindTexture(gl.TEXTURE_2D, actor._tex)
+
+				gl.DrawArrays(gl.TRIANGLES, 0, int32(actor._vert_count))
+				change_color = float32(1.0)
+				gl.Uniform1f(transparencyUniform, change_color)
+			}
+		}
+	}
 
 	for _, sub_actor := range actor._sub_actors {
 		sub_actor.Draw(f0)
@@ -262,4 +277,63 @@ func (actor *Actor) Draw(f0 core.BaseFunc) {
 
 		gl.DrawArrays(gl.TRIANGLES, 0, 3)
 	*/
+}
+
+func (actor *Actor) DrawDepthMap(tex uint32) {
+	// Set camera to ortho mode
+	projection := mgl32.Ortho(0, 1000, 0, 1000, -1000, 1000) //mgl32.Ident4() //
+	projectionUniform := gl.GetUniformLocation(actor._renderer.program, gl.Str("projection\x00"))
+	gl.UniformMatrix4fv(projectionUniform, 1, false, &projection[0])
+
+	camera := mgl32.Ident4()
+	cameraUniform := gl.GetUniformLocation(actor._renderer.program, gl.Str("camera\x00"))
+	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+
+	colorUniform := gl.GetUniformLocation(actor._renderer.program, gl.Str("camp_color\x00"))
+	change_color := float32(1.0)
+	gl.Uniform3f(colorUniform, change_color, change_color, change_color)
+
+	scale := float32(200)
+	center_x := float32(800)
+	center_y := float32(800)
+
+	actor._vert_buffer[0] = center_x - scale
+	actor._vert_buffer[1] = center_y - scale
+	actor._vert_buffer[3] = 0
+	actor._vert_buffer[4] = 0
+
+	actor._vert_buffer[5] = center_x + scale
+	actor._vert_buffer[6] = center_y + scale
+	actor._vert_buffer[8] = 1
+	actor._vert_buffer[9] = 1
+
+	actor._vert_buffer[10] = center_x + scale
+	actor._vert_buffer[11] = center_y - scale
+	actor._vert_buffer[13] = 1
+	actor._vert_buffer[14] = 0
+
+	actor._vert_buffer[15] = center_x - scale
+	actor._vert_buffer[16] = center_y - scale
+	actor._vert_buffer[18] = 0
+	actor._vert_buffer[19] = 0
+
+	actor._vert_buffer[20] = center_x - scale
+	actor._vert_buffer[21] = center_y + scale
+	actor._vert_buffer[23] = 0
+	actor._vert_buffer[24] = 1
+
+	actor._vert_buffer[25] = center_x + scale
+	actor._vert_buffer[26] = center_y + scale
+	actor._vert_buffer[28] = 1
+	actor._vert_buffer[29] = 1
+
+	gl.BindBuffer(gl.ARRAY_BUFFER, actor._vbo)
+	gl.BufferData(gl.ARRAY_BUFFER, int(actor._vert_buffer_size), gl.Ptr(actor._vert_buffer), gl.DYNAMIC_DRAW)
+
+	gl.BindVertexArray(actor._vao)
+
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, tex)
+
+	gl.DrawArrays(gl.TRIANGLES, 0, int32(actor._vert_count))
 }

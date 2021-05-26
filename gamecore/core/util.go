@@ -1,18 +1,35 @@
 package core
 
 import (
+	"math"
 	"os"
+	"runtime"
+
+	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/ungerik/go3d/vec3"
 )
 
 var LogHandle *os.File
 
+func GetCallStack() string {
+	var buffer [2048 * 1024]byte
+	size := runtime.Stack(buffer[0:], true)
+	crashed_stack := string(buffer[0:size])
+	return crashed_stack
+}
+
 func LogStr(log string) {
 	if LogHandle == nil {
 		return
 	}
 	LogHandle.WriteString(log)
+
+	if GameInst.LogoutStack {
+		LogHandle.WriteString("\n")
+		LogHandle.WriteString(GetCallStack())
+	}
+
 	LogHandle.WriteString("\n")
 	LogHandle.Sync()
 }
@@ -143,6 +160,188 @@ func CheckEnemyOnDirWithinDist(my_camp int32, position *vec3.T, dir *vec3.T, dis
 	return false, nil
 }
 
+func CheckSegmentThroughObject(points []vec3.T, actor *StaticUnit) bool {
+	through := false
+	through, _ = actor.CheckBeenThrough(points[0], points[1])
+
+	return through
+}
+
+func max_of_arr(a []float32) float32 {
+	max_val := -float32(math.MaxFloat32)
+	for _, v := range a {
+		if v > max_val {
+			max_val = v
+		}
+	}
+
+	return max_val
+}
+
+func min_of_arr(a []float32) float32 {
+	min_val := float32(math.MaxFloat32)
+	for _, v := range a {
+		if v < min_val {
+			min_val = v
+		}
+	}
+
+	return min_val
+}
+
+func rearr_minmax(min float32, max float32) (float32, float32) {
+	if max < min {
+		return max, min
+	} else {
+		return min, max
+	}
+}
+
+func CalculateViewDepth(f0 BaseFunc) {
+	game := &GameInst
+
+	view_depth := f0.ViewDepth()
+	start_point := f0.Position()
+	view_frustum := f0.ViewFrustum()
+	y_gap := vec3.Sub(&view_frustum[0], &view_frustum[3])
+	x_gap := vec3.Sub(&view_frustum[2], &view_frustum[3])
+
+	for _idx := 0; _idx < game.DepthMapSize; _idx += 1 {
+		x_ratio := float32(_idx+1) / float32(game.DepthMapSize)
+		x_offset := x_gap
+		x_offset.Scale(x_ratio)
+
+		for _idy := 0; _idy < game.DepthMapSize; _idy += 1 {
+			y_ratio := float32(_idy+1) / float32(game.DepthMapSize)
+			y_offset := y_gap
+			y_offset.Scale(y_ratio)
+			end_point := view_frustum[3]
+			end_point.Add(&x_offset).Add(&y_offset)
+			nearest_depth := float32(1.0)
+			for _, v := range game.BattleField.Props {
+				_collide, distance, _ := v.GetNearestCollidePoint(start_point, end_point)
+				if _collide {
+					if distance < nearest_depth {
+						nearest_depth = distance
+					}
+				}
+			}
+
+			view_depth[_idx*game.DepthMapSize+_idy] = nearest_depth
+		}
+	}
+
+}
+
+func CheckSegmentThroughAABB(points []vec3.T, actor *StaticUnit) bool {
+
+	a := points[0][0]
+	b := points[1][0]
+	m := actor.BB.Xmin
+	txmin := (m - b) / (a - b)
+
+	a = points[0][0]
+	b = points[1][0]
+	m = actor.BB.Xmax
+	txmax := (m - b) / (a - b)
+
+	a = points[0][1]
+	b = points[1][1]
+	m = actor.BB.Ymin
+	tymin := (m - b) / (a - b)
+
+	a = points[0][1]
+	b = points[1][1]
+	m = actor.BB.Ymax
+	tymax := (m - b) / (a - b)
+
+	a = points[0][2]
+	b = points[1][2]
+	m = actor.BB.Zmin
+	tzmin := (m - b) / (a - b)
+
+	a = points[0][2]
+	b = points[1][2]
+	m = actor.BB.Zmax
+	tzmax := (m - b) / (a - b)
+
+	txmin, txmax = rearr_minmax(txmin, txmax)
+	tymin, tymax = rearr_minmax(tymin, tymax)
+	tzmin, tzmax = rearr_minmax(tzmin, tzmax)
+
+	enter_latest := max_of_arr([]float32{txmin, tymin, tzmin})
+	leave_earliest := min_of_arr([]float32{txmax, tymax, tzmax})
+	if leave_earliest >= enter_latest {
+		return true
+	}
+
+	return false
+}
+
+func CheckIfSeperated(hero BaseFunc, enemy BaseFunc) bool {
+	game := &GameInst
+
+	var segment []vec3.T
+	for _, v := range game.BattleField.Props {
+
+		segment = []vec3.T{hero.Position(), enemy.Position()}
+		through_aabb := CheckSegmentThroughAABB(segment, v)
+		if through_aabb {
+			through_object := CheckSegmentThroughObject(segment, v)
+			if through_object {
+				return true
+			}
+		}
+
+	}
+	return false
+}
+
+func CheckEnemyInFrustum(camp int32, hero BaseFunc) (bool, BaseFunc) {
+	view_dir := hero.Direction()
+	if view_dir[0] == 0 {
+		return false, nil
+	}
+
+	game := &GameInst
+
+	position := hero.Position()
+	dist := float32(0)
+	min_dist := hero.ViewRange()
+	var min_dist_enemy BaseFunc
+	min_dist_enemy = nil
+	for _, v := range game.BattleUnits {
+		if v.Attackable() == false {
+			continue
+		}
+
+		unit_pos := v.Position()
+		if v.Camp() != camp && v.Health() > 0 {
+			dist = vec3.Distance(&position, &unit_pos)
+			if dist < min_dist {
+				enemy_dir := vec3.Sub(&unit_pos, &position)
+				view_dir = hero.Direction()
+				enemy_angle := vec3.Angle(&view_dir, &enemy_dir)
+				if enemy_angle < mgl32.DegToRad(hero.Fov()/2) {
+					// Check if the two objects are not seperated by Static objects
+					seperated := CheckIfSeperated(hero, v)
+					if !seperated {
+						min_dist = dist
+						min_dist_enemy = v
+					}
+				}
+			}
+		}
+	}
+
+	if min_dist_enemy != nil {
+		return true, min_dist_enemy
+	}
+
+	// fmt.Println("->CheckEnemyNearby")
+	return false, nil
+}
+
 func CheckEnemyNearby(camp int32, radius float32, position *vec3.T) (bool, BaseFunc) {
 	game := &GameInst
 	dist := float32(0)
@@ -230,7 +429,7 @@ func InitHeroWithCamp(battle_unit BaseFunc, camp int32, pos_x float32, pos_y flo
 func ConvertNum2Dir(action_code int) (dir vec3.T) {
 	offset_x := float32(0)
 	offset_y := float32(0)
-	const_val := float32(20)
+	const_val := float32(200)
 
 	switch action_code {
 	case 0: // do nothing

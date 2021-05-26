@@ -24,10 +24,11 @@ import (
 
 type Renderer struct {
 	// Render related
-	window   *glfw.Window
-	program  uint32
-	textures map[string]uint32
-	actors   map[int32]*Actor
+	window        *glfw.Window
+	program       uint32
+	textures      map[string]uint32
+	actors        map[int32]*Actor
+	tex_depth_map uint32
 
 	_view_angle  float32
 	_view_dist   float32
@@ -142,6 +143,31 @@ func newTexture(file string) (uint32, error) {
 	return texture, nil
 }
 
+//	data = data2[:]
+func newDepthTexture(width int32, height int32, data []uint8) (uint32, error) {
+	//	data2 := [100 * 100 * 4]uint8{}
+	var texture uint32
+	gl.GenTextures(1, &texture)
+	gl.ActiveTexture(gl.TEXTURE0)
+	gl.BindTexture(gl.TEXTURE_2D, texture)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TexImage2D(
+		gl.TEXTURE_2D,
+		0,
+		gl.RGBA,
+		width,
+		height,
+		0,
+		gl.RGBA,
+		gl.UNSIGNED_BYTE,
+		gl.Ptr(data))
+
+	return texture, nil
+}
+
 var vertexShader = `
 #version 330
 uniform mat4 projection;
@@ -160,12 +186,14 @@ var fragmentShader = `
 #version 330
 uniform sampler2D tex;
 uniform vec3 camp_color;
+uniform float transparency;
 
 in vec2 fragTexCoord;
 out vec4 outputColor;
 void main() {
 	outputColor = texture(tex, fragTexCoord);
 	outputColor.rgb = outputColor.rgb * camp_color;
+	outputColor.a = outputColor.a * transparency;
 }
 ` + "\x00"
 
@@ -226,6 +254,18 @@ func key_call_back(w *glfw.Window, char rune) {
 
 	case "w":
 		RendererInst._fov += 0.1
+
+	case " ":
+		core.GameInst.Paused = !core.GameInst.Paused
+
+	case "[":
+		core.GameInst.ShowDepthMap = !core.GameInst.ShowDepthMap
+
+	case "]":
+		core.GameInst.ShowMiniMap = !core.GameInst.ShowMiniMap
+
+	case "<":
+		core.GameInst.ShowFrustum = !core.GameInst.ShowFrustum
 	}
 
 }
@@ -274,7 +314,7 @@ func mouse_button_call_back(w *glfw.Window, button glfw.MouseButton, action glfw
 	target_pos.Scale(10000).Add(&_view_pos)
 
 	// 3. check cross point
-	collide_pos, _ret := core.GetCollidePosT(_view_pos, target_pos, []vec3.T{vec3.T{0, -30000, 20}, vec3.T{-30000, 30000, 20}, {30000, 30000, 20}})
+	collide_pos, _, _ret := core.GetCollidePosT(_view_pos, target_pos, []vec3.T{vec3.T{0, -30000, 20}, vec3.T{-30000, 30000, 20}, {30000, 30000, 20}})
 	var logic_pos_x, logic_pos_y float32
 	if _ret {
 		logic_pos_x, logic_pos_y = collide_pos[0], collide_pos[1]
@@ -354,6 +394,9 @@ func (renderer *Renderer) InitRenderEnv(game *core.Game) {
 	// camera := mgl32.LookAtV(mgl32.Vec3{windowWidth / 20, windowHeight / 20, -50}, mgl32.Vec3{windowWidth / 2, windowHeight / 2, 0}, mgl32.Vec3{0, -1, 0}) // mgl32.Ortho(0, 1000, 0, 1000, -1, 1) //
 	// cameraUniform := gl.GetUniformLocation(program, gl.Str("camera\x00"))
 	// gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
+	transparencyUniform := gl.GetUniformLocation(program, gl.Str("transparency\x00"))
+	change_color := float32(1.0)
+	gl.Uniform1f(transparencyUniform, change_color)
 
 	model := mgl32.Ident4()
 	modelUniform := gl.GetUniformLocation(program, gl.Str("model\x00"))
@@ -365,6 +408,8 @@ func (renderer *Renderer) InitRenderEnv(game *core.Game) {
 	gl.BindFragDataLocation(program, 0, gl.Str("outputColor\x00"))
 
 	renderer.LoadCfgFolder()
+
+	// Create minimap and depthmap Texture
 
 	// Configure global settings
 	gl.Enable(gl.DEPTH_TEST)
@@ -528,6 +573,43 @@ func (renderer *Renderer) Render() {
 			actor.Draw(v)
 		}
 	}
+
+	// Draw the minimap and depth map here
+	gl.Clear(gl.DEPTH_BUFFER_BIT)
+
+	if core.GameInst.ShowDepthMap {
+		// Draw the minimap or depth map
+		// Create Texture buffer from data buffer
+		tex_depth_data := make([]uint8, core.GameInst.DepthMapSize*core.GameInst.DepthMapSize*4)
+		view_depth := renderer.game.SelfHeroes[0].(core.BaseFunc).ViewDepth()
+		for _idx := 0; _idx < core.GameInst.DepthMapSize*core.GameInst.DepthMapSize; _idx += 1 {
+			tex_depth_data[_idx*4+0] = byte(view_depth[_idx] * 255)
+			tex_depth_data[_idx*4+1] = byte(view_depth[_idx] * 255)
+			tex_depth_data[_idx*4+2] = byte(view_depth[_idx] * 255)
+			tex_depth_data[_idx*4+3] = byte(255)
+		}
+		depth_tex, _ := newDepthTexture(int32(core.GameInst.DepthMapSize), int32(core.GameInst.DepthMapSize), tex_depth_data)
+		renderer.actors[9999].DrawDepthMap(depth_tex)
+	}
+
+	/*
+
+		target := uint32(gl.TEXTURE_2D)
+		level := int32(0)
+		xoffset := int32(0)
+		yoffset := int32(0)
+		width := int32(game.DepthMapSize)
+		height := int32(game.DepthMapSize)
+		format := uint32(gl.RED)
+		xtype := uint32(gl.FLOAT)
+
+		view_depth := [10000]float32{} //renderer.game.SelfHeroes[0].(core.BaseFunc).ViewDepth()
+		// The code will crash using the commented code here.
+
+		pixels := gl.Ptr(view_depth[:])
+
+		gl.TexSubImage2D(target, level, xoffset, yoffset, width, height, format, xtype, pixels)
+	*/
 
 	// Maintenance
 	renderer.window.SwapBuffers()

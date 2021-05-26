@@ -12,6 +12,7 @@ BATTLE_FIELD_SIZE = 1000.0
 MAIN_ACTION_DIMS = 3
 MOVE_DIMS = 8
 SKILL_DIMS = 8
+DEPTH_MAP_SIZE = 30
 
 def FindHeroSkills(hero_cfg_file_path, hero_id):
     hero_cfg_file = '{}/{}.json'.format(hero_cfg_file_path, hero_id)
@@ -36,6 +37,9 @@ def GetSkillTypes(skill_cfg_file_path, hero_skills):
     return skill_dir_type_check    
 
 def InitMetaConfig(scene_id):
+    global BATTLE_FIELD_SIZE
+    global DEPTH_MAP_SIZE
+
     obs_size = 0
     self_hero_count = 0
     oppo_hero_count = 0
@@ -53,6 +57,9 @@ def InitMetaConfig(scene_id):
         map_dict = None
         with open(training_map_file, 'r') as file_handle:
             map_dict = json.load(file_handle)
+
+        BATTLE_FIELD_SIZE = map_dict['Width']
+        DEPTH_MAP_SIZE = map_dict['DepthMapSize']
 
         for hero_id in map_dict['SelfHeroes']:
             hero_skills = FindHeroSkills(hero_cfg_file_path, hero_id)
@@ -81,6 +88,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         self.done = False
         
         self.state = None
+        self.depth = None
         self.reward = 0
         self.info = ValorantEnvInfo()
         self.last_state = None
@@ -103,7 +111,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         my_env['TF_CPP_MIN_LOG_LEVEL'] = '3'
         gamecore_file_path = '{}/../../../gamecore/gamecore'.format(root_folder)
         self.proc = subprocess.Popen([gamecore_file_path, 
-                                '-render=true', '-gym_mode=true', '-debug_log=true', '-slow_tick=true', 
+                                '-render=false', '-gym_mode=true', '-debug_log=false', '-slow_tick=true', 
                                 '-multi_player=true', '-scene={}'.format(scene_id), manual_str],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
@@ -128,9 +136,12 @@ class ValorantMultiPlayerEnv(gym.Env):
         print('moba_env initialized.')
         pass
 
-    def fill_state(self, state, json_data):
+    def fill_state(self, state, depth, json_data):
         # View from the point view of each self
         self_hero_count = int(json_data['SelfHeroCount'])
+
+        for _idx in range(DEPTH_MAP_SIZE * DEPTH_MAP_SIZE):
+            depth[0][_idx] = json_data['SelfHeroDepthMap'][0][_idx]
         
         for hero_idx in range(self_hero_count):        
             feature_idx = 0    
@@ -245,7 +256,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 print('json_str == None or len(json_str) == 0')
                 self.done = True
                 self.reward = 0
-                return self.state, self.reward, self.done, self.info
+                return [self.state, self.depth], self.reward, self.done, self.info
 
             try:
                 str_json = json_str.decode("utf-8")
@@ -256,7 +267,7 @@ class ValorantMultiPlayerEnv(gym.Env):
 
                 jobj = json.loads(parts[1])
                 self.last_state[...] = self.state[...]
-                self.fill_state(self.state, jobj)
+                self.fill_state(self.state, self.depth, jobj)
 
                 if jobj['SelfWin'] != 0:
                     self.done = True
@@ -286,15 +297,15 @@ class ValorantMultiPlayerEnv(gym.Env):
                 self.done = True
                 self.reward = 0
                 self.info.step_idx = self.step_idx
-                return self.state, self.reward, self.done, self.info
+                return [self.state, self.depth], self.reward, self.done, self.info
 
         self.info.step_idx = self.step_idx
-        return self.state, self.reward, self.done, self.info
+        return [self.state, self.depth], self.reward, self.done, self.info
 
 
     def reset(self):
         if 0 == self.step_idx:
-            return self.state
+            return [self.state, self.depth]
         self.restart_proc()
         # To avoid deadlocks: careful to: add \n to output, flush output, use
         # readline() rather than read()
@@ -327,8 +338,9 @@ class ValorantMultiPlayerEnv(gym.Env):
                 state_feature_count = (self.self_hero_count + self.oppo_hero_count) * ONE_HERO_FEATURE_SIZE
 
                 self.state = np.zeros((self.self_hero_count, state_feature_count))
+                self.depth = np.zeros((1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE))
                 
-                self.fill_state(self.state, jobj)                
+                self.fill_state(self.state, self.depth, jobj)                
                 self.last_state = self.state.copy()
                 break
 
@@ -336,7 +348,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 print('When resetting env, parsing json failed.')
                 continue
     
-        return self.state
+        return [self.state, self.depth]
 
 
     def render(self, mode='human'):

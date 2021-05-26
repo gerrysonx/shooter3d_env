@@ -32,6 +32,7 @@ LAYER_SIZE = 128
 
 C = 1
 HERO_COUNT = 0
+DEPTH_MAP_SIZE = 0
 
 # Hero skill mask, to indicate if a hero skill is a directional one.
 # Dynamically load src hero skill types
@@ -64,7 +65,7 @@ g_out_tb = True
 # Control if train or play
 g_is_train = True
 # True means start a new train task without loading previous model.
-g_start_anew = True
+g_start_anew = False
 
 # Control if use priority sampling
 g_enable_per = False
@@ -111,26 +112,35 @@ class Environment(object):
   def __init__(self):
     self.env = gym.make(ENV_NAME)
     self._screen = None
+    self._depth = None
+
     self.reward = 0
     self.terminal = True
     self.random_start = RANDOM_START_STEPS
     self.obs = np.zeros(shape=(HERO_COUNT, STATE_SIZE, C), dtype=np.float)
+    self.depths = np.zeros(shape=(1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE, C), dtype=np.float)
 
   def get_action_space(self):
     return self.env.action_space
 
   def step(self, action):
-    self._screen, self.reward, self.terminal, info = self.env.step(action)
+    _state, self.reward, self.terminal, info = self.env.step(action)
+    self._screen, self._depth = _state[0], _state[1]
     self.obs[..., :-1] = self.obs[..., 1:]
     self.obs[..., -1] = self._screen
-    return self.obs, self.reward, self.terminal, info
+
+    self.depths[..., :-1] = self.depths[..., 1:]
+    self.depths[..., -1] = self._depth   
+    return [self.obs, self.depths], self.reward, self.terminal, info
 
   def reset(self):
-    self._screen = self.env.reset()
+    _state = self.env.reset()
+    self._screen, self._depth = _state[0], _state[1]
     for idx in range(C):
         self.obs[..., idx] = self._screen
+        self.depths[..., idx] = self._depth
 
-    return self.obs
+    return [self.obs, self.depths]
 
 
 class MultiPlayer_Data_Generator():
@@ -150,7 +160,8 @@ class MultiPlayer_Data_Generator():
             ac.append([0, 0, 0])
 
         new = True # marks if we're on first timestep of an episode
-        ob = self.env.reset()
+        env_state = self.env.reset()
+        ob, depth = env_state[0], env_state[1]
 
         cur_ep_ret = 0 # return in current episode
         cur_ep_unclipped_ret = 0 # unclipped return in current episode
@@ -161,6 +172,7 @@ class MultiPlayer_Data_Generator():
 
         # Initialize history arrays
         obs = np.array([np.zeros(shape=(HERO_COUNT, STATE_SIZE, C), dtype=np.float32) for _ in range(horizon)])
+        depths = np.array([np.zeros(shape=(1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE, C), dtype=np.float32) for _ in range(horizon)])
         rews = np.zeros(horizon, 'float32')
         unclipped_rews = np.zeros(horizon, 'float32')
         vpreds = np.zeros(horizon, 'float32')
@@ -170,7 +182,7 @@ class MultiPlayer_Data_Generator():
 
         while True:
             prevac = ac
-            ac, vpred = self.agent.predict(ob[np.newaxis, ...])
+            ac, vpred = self.agent.predict(ob[np.newaxis, ...], depth[np.newaxis, ...])
             #print('Action:', ac, 'Value:', vpred)
             # Slight weirdness here because we need value function at time T
             # before returning segment [0, T-1] so we get the correct
@@ -179,7 +191,7 @@ class MultiPlayer_Data_Generator():
                 yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
                         "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
                         "ep_rets" : ep_rets, "ep_lens" : ep_lens,
-                        "ep_unclipped_rets": ep_unclipped_rets}
+                        "ep_unclipped_rets": ep_unclipped_rets, "depth": depths}
                 # Be careful!!! if you change the downstream algorithm to aggregate
                 # several of these batches, then be sure to do a deepcopy
                 ep_rets = []
@@ -187,12 +199,16 @@ class MultiPlayer_Data_Generator():
                 ep_lens = []
             i = t % horizon
             obs[i] = ob
+            depths[i] = depth
+
             vpreds[i] = vpred
             news[i] = new
             acs[i] = ac
             prevacs[i] = prevac
 
-            ob, unclipped_rew, new, step_info = self.env.step(ac)
+            env_state, unclipped_rew, new, step_info = self.env.step(ac)
+            ob, depth = env_state[0], env_state[1]
+
             rew = unclipped_rew
             # rew = float(np.sign(unclipped_rew))
             rews[i] = rew
@@ -211,7 +227,8 @@ class MultiPlayer_Data_Generator():
                 cur_ep_ret = 0
                 cur_ep_unclipped_ret = 0
                 cur_ep_len = 0
-                ob = self.env.reset()
+                env_state = self.env.reset()
+                ob, depth = env_state[0], env_state[1]
             t += 1
     
     def add_vtarg_and_adv(self, seg, gamma=0.99, lam=0.95):
@@ -263,6 +280,7 @@ class MultiPlayerAgent():
         self.policy_head_num = len(self.a_space)
 
         self.input_dims = STATE_SIZE
+        self.depth_map_size = DEPTH_MAP_SIZE
         self.learning_rate = LEARNING_RATE
         self.num_total_steps = NUM_STEPS
         self.lenbuffer = deque(maxlen=100) # rolling buffer for episode lengths
@@ -290,6 +308,9 @@ class MultiPlayerAgent():
         with tf.variable_scope('input'):
             self.multi_s = tf.placeholder(tf.float32, [None, HERO_COUNT, self.input_dims, C], name='multi_s')
 
+            # Depth map
+            self.multi_d = tf.placeholder(tf.float32, [None, HERO_COUNT, self.depth_map_size * self.depth_map_size, C], name='multi_d')
+
             # Action shall have 2 elements, 
             self.multi_a = tf.placeholder(tf.int32, [None, HERO_COUNT, self.policy_head_num], name='multi_a')
 
@@ -298,6 +319,7 @@ class MultiPlayerAgent():
             self.importance_sample_arr_pl = tf.placeholder(tf.float32, [None, ], name='importance_sample')
 
             tf.summary.histogram("input_state", self.multi_s)
+            tf.summary.histogram("input_depth_map", self.multi_d)
             tf.summary.histogram("input_action", self.multi_a)
             tf.summary.histogram("input_cumulative_r", self.cumulative_r)
             tf.summary.histogram("input_adv", self.adv)
@@ -396,8 +418,11 @@ class MultiPlayerAgent():
         with tf.variable_scope(scope):
             for actor_idx in range(actor_count):
                 input_pl = self.multi_s[:,actor_idx,:,:]
+
+                # Now there is only one hero, so we force hero id as 0
+                input_depth = self.multi_d[:,0,:]
                 # Share weights
-                a_prob_arr, a_logits_arr, value = self._init_single_actor_net(scope, input_pl, trainable)
+                a_prob_arr, a_logits_arr, value = self._init_single_actor_net(scope, input_pl, input_depth, trainable)
                 a_prob_arr_arr.append(a_prob_arr)
                 a_logits_arr_arr.append(a_logits_arr)
                 value_arr.append(value)
@@ -406,14 +431,32 @@ class MultiPlayerAgent():
             return a_prob_arr_arr, a_logits_arr_arr, value_arr, merged_summary
         pass
 
-    def _init_single_actor_net(self, scope, input_pl, trainable=True):        
+    def _init_single_actor_net(self, scope, input_pl, input_depth, trainable=True):        
         my_initializer = tf.contrib.layers.xavier_initializer()
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             if trainable:
                 tf.summary.histogram("hidde input:", input_pl)
                 
             flat_output_size = STATE_SIZE*C
-            flat_output = tf.reshape(input_pl, [-1, flat_output_size], name='flat_output')
+            flat_output = tf.reshape(input_pl, [-1, flat_output_size], name='flat_state_input')
+
+            square_depth_input = tf.reshape(input_depth, [-1, self.depth_map_size, self.depth_map_size, 1], name='square_depth_input')
+
+            conv_channel_count = 4
+            down_sample_ratio = 4
+            depth_cnn_w_1 = tf.get_variable("depth_cnn_w_1", [8, 8, 1, conv_channel_count], initializer=my_initializer)
+            depth_cnn_b_1 = tf.get_variable("depth_cnn_b_1", [conv_channel_count], initializer=tf.constant_initializer(0.0))
+
+            depth_map_embedding = tf.nn.relu(
+                tf.nn.bias_add(
+                tf.nn.conv2d(square_depth_input, depth_cnn_w_1, 
+                strides=[1, down_sample_ratio, down_sample_ratio, 1], 
+                padding='SAME'), 
+                depth_cnn_b_1))
+                
+            # Flat conv output
+            conv_flat_dim = int(conv_channel_count * (self.depth_map_size / down_sample_ratio)**2)
+            flat_conv_output = tf.reshape(depth_map_embedding, [-1, conv_flat_dim], name='flat_conv_output')
 
             # Add hero one-hot vector embedding
             if g_embed_hero_id:
@@ -448,7 +491,12 @@ class MultiPlayerAgent():
 
                 output1 = tf.nn.relu(tf.matmul(flat_output, fc_W_1) + fc_b_1)                
 
-            fc_W_2 = tf.get_variable(shape=[self.layer_size, self.layer_size], name='fc_W_2',
+            # Concat the output1 with depth embedding
+            concat_output_dim = conv_flat_dim + self.layer_size
+            concat_output = tf.concat([output1, flat_conv_output], axis = -1)
+
+
+            fc_W_2 = tf.get_variable(shape=[concat_output_dim, self.layer_size], name='fc_W_2',
                 trainable=trainable, initializer=my_initializer)
 
             fc_b_2 = tf.get_variable(shape=[self.layer_size], name='fc_b_2',
@@ -457,7 +505,7 @@ class MultiPlayerAgent():
             tf.summary.histogram("fc_W_2", fc_W_2)
             tf.summary.histogram("fc_b_2", fc_b_2)
 
-            output2 = tf.nn.relu(tf.matmul(output1, fc_W_2) + fc_b_2)
+            output2 = tf.nn.relu(tf.matmul(concat_output, fc_W_2) + fc_b_2)
 
 
             fc_W_3 = tf.get_variable(shape=[self.layer_size, self.layer_size], name='fc_W_3',
@@ -517,13 +565,14 @@ class MultiPlayerAgent():
             
             return a_prob_arr, a_logits_arr, value
 
-    def predict(self, s):
+    def predict(self, s, depth):
         # Calculate a eval prob.
         action_arr = []
         value_arr = []
 
         for hero_idx in range(HERO_COUNT):
-            tuple_val = self.session.run([self.value[hero_idx], self.a_policy_new[hero_idx][0], self.a_policy_new[hero_idx][1], self.a_policy_new[hero_idx][2]], feed_dict={self.multi_s: s})
+            tuple_val = self.session.run([self.value[hero_idx], self.a_policy_new[hero_idx][0], self.a_policy_new[hero_idx][1], self.a_policy_new[hero_idx][2]], 
+            feed_dict={self.multi_s: s, self.multi_d: depth})
             value = tuple_val[0]
             chosen_policy = tuple_val[1:]
             #chosen_policy = self.session.run(self.a_policy_new, feed_dict={self.s: s})
@@ -613,7 +662,7 @@ class MultiPlayerAgent():
 
     def learn_one_traj(self, timestep, seg):
         lens, rets, unclipped_rets = np.array(seg["ep_lens"]), np.array(seg["ep_rets"]), np.array(seg["ep_unclipped_rets"])
-        ob, ac, atarg, tdlamret = np.array(seg["ob"]), np.array(seg["ac"]), np.array(seg["std_atvtg"]), np.array(seg["tdlamret"])
+        ob, ac, atarg, tdlamret, depth = np.array(seg["ob"]), np.array(seg["ac"]), np.array(seg["std_atvtg"]), np.array(seg["tdlamret"]), np.array(seg['depth'])
 
         self.session.run(self.update_policy_net_op)
 
@@ -639,6 +688,7 @@ class MultiPlayerAgent():
                     self.adv: atarg[temp_indices],
                     self.multi_s: ob[temp_indices],
                     self.multi_a: ac[temp_indices],
+                    self.multi_d: depth[temp_indices],
                     self.cumulative_r: tdlamret[temp_indices],
                 })
 
@@ -666,6 +716,8 @@ def InitMetaConfig(scene_id):
     global HERO_COUNT
     global g_dir_skill_mask
     global STATE_SIZE
+    global DEPTH_MAP_SIZE
+
     try:
         # Load train self heroes skill masks
         root_folder = os.path.split(os.path.abspath(__file__))[0]
@@ -678,6 +730,8 @@ def InitMetaConfig(scene_id):
         map_dict = None
         with open(training_map_file, 'r') as file_handle:
             map_dict = json.load(file_handle)
+
+        DEPTH_MAP_SIZE = map_dict['DepthMapSize']
 
         for hero_id in map_dict['SelfHeroes']:
             hero_skills = FindHeroSkills(hero_cfg_file_path, hero_id)
@@ -835,7 +889,7 @@ def GetSkillTypes(skill_cfg_file_path, hero_skills):
 
 if __name__=='__main__':
 
-    scene_id = 13
+    scene_id = 10
     my_env = os.environ
     my_env['moba_env_is_train'] = 'True'
     my_env['moba_env_scene_id'] = '{}'.format(scene_id)

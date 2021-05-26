@@ -8,6 +8,7 @@ import (
 	_ "image/png"
 	"math"
 	"os"
+	"strings"
 
 	"../common"
 	"github.com/ungerik/go3d/vec3"
@@ -47,9 +48,10 @@ type BattleField struct {
 	Restricted_w float32
 	Restricted_h float32
 	Props        []*StaticUnit
+	Route        []vec3.T
 }
 
-func GetCollidePosT(start vec3.T, pos vec3.T, tri []vec3.T) (vec3.T, bool) {
+func GetCollidePosT(start vec3.T, pos vec3.T, tri []vec3.T) (vec3.T, float32, bool) {
 	var collide_pos vec3.T
 	P0, P1, P2 := tri[0], tri[1], tri[2]
 	D := vec3.Sub(&pos, &start)
@@ -65,7 +67,7 @@ func GetCollidePosT(start vec3.T, pos vec3.T, tri []vec3.T) (vec3.T, bool) {
 	S2D_dot := vec3.Dot(&S2, &D)
 
 	if S1E1_dot == 0 {
-		return collide_pos, false
+		return collide_pos, 0, false
 	}
 
 	t := S2E2_dot / S1E1_dot
@@ -75,15 +77,16 @@ func GetCollidePosT(start vec3.T, pos vec3.T, tri []vec3.T) (vec3.T, bool) {
 
 	if t > 0 && t < 1 && b1 > 0 && b1 < 1 && b2 > 0 && b2 < 1 && b0 > 0 && b0 < 1 {
 		collide_pos = *P0.Scale(b0).Add(P1.Scale(b1)).Add(P2.Scale(b2))
-		return collide_pos, true
+		return collide_pos, t, true
 	}
 
-	return collide_pos, false
+	return collide_pos, t, false
 }
 
-func GetCollidePos(start vec3.T, pos vec3.T, tri []float32) (vec3.T, bool) {
+func GetCollidePos(start vec3.T, pos vec3.T, tri []float32) (vec3.T, float32, bool) {
 	var collide_pos vec3.T
 	var ret bool
+	var t float32
 	var P0, P1, P2 vec3.T
 	P0[0] = tri[0]
 	P0[1] = tri[1]
@@ -96,8 +99,8 @@ func GetCollidePos(start vec3.T, pos vec3.T, tri []float32) (vec3.T, bool) {
 	P2[0] = tri[10]
 	P2[1] = tri[11]
 	P2[2] = tri[12]
-	collide_pos, ret = GetCollidePosT(start, pos, []vec3.T{P0, P1, P2})
-	return collide_pos, ret
+	collide_pos, t, ret = GetCollidePosT(start, pos, []vec3.T{P0, P1, P2})
+	return collide_pos, t, ret
 
 }
 
@@ -121,7 +124,7 @@ func (unit *StaticUnit) CheckWithin(pos vec3.T) bool {
 	var if_collide bool
 
 	for _idx := 0; _idx < tri_count; _idx++ {
-		_, if_collide = GetCollidePos(pos, unit.Pos, unit.Vertice[_idx*_tri_data_len:(_idx+1)*_tri_data_len])
+		_, _, if_collide = GetCollidePos(pos, unit.Pos, unit.Vertice[_idx*_tri_data_len:(_idx+1)*_tri_data_len])
 		if if_collide {
 			// inner, outer, definitely outside the box
 			return false
@@ -131,11 +134,55 @@ func (unit *StaticUnit) CheckWithin(pos vec3.T) bool {
 	return true
 }
 
+func (unit *StaticUnit) GetNearestCollidePoint(start vec3.T, end vec3.T) (bool, float32, vec3.T) {
+	// Second, check if pos -> unit-center direction collision with triangle point, and to determin if it's within
+	_tri_data_len := 15
+	tri_count := len(unit.Vertice) / _tri_data_len
+	var _collide_pos, nearest_collide_pos vec3.T
+	var t float32
+
+	have_collide := false
+	_collide := false
+	nearest_t := float32(1.0)
+
+	for _idx := 0; _idx < tri_count; _idx++ {
+		_collide_pos, t, _collide = GetCollidePos(start, end, unit.Vertice[_idx*_tri_data_len:(_idx+1)*_tri_data_len])
+		if _collide {
+			have_collide = true
+			if t < nearest_t {
+				nearest_t = t
+				nearest_collide_pos = _collide_pos
+			}
+		}
+	}
+
+	return have_collide, nearest_t, nearest_collide_pos
+}
+
+func (unit *StaticUnit) CheckBeenThrough(start vec3.T, end vec3.T) (bool, vec3.T) {
+	// Second, check if pos -> unit-center direction collision with triangle point, and to determin if it's within
+	_tri_data_len := 15
+	tri_count := len(unit.Vertice) / _tri_data_len
+	var _collide_pos vec3.T
+
+	var if_collide bool
+
+	for _idx := 0; _idx < tri_count; _idx++ {
+		_collide_pos, _, if_collide = GetCollidePos(start, end, unit.Vertice[_idx*_tri_data_len:(_idx+1)*_tri_data_len])
+		if if_collide {
+			// inner, outer, definitely outside the box
+			return true, _collide_pos
+		}
+	}
+
+	return false, _collide_pos
+}
+
 func (battle_field *BattleField) Within(pos_x float32, pos_y float32) bool {
-	if pos_x > battle_field.Restricted_x &&
-		pos_x < battle_field.Restricted_x+battle_field.Restricted_w &&
-		pos_y > battle_field.Restricted_y &&
-		pos_y < battle_field.Restricted_y+battle_field.Restricted_h {
+	if pos_x > -float32(battle_field.Width) &&
+		pos_x < float32(battle_field.Width) &&
+		pos_y > -float32(battle_field.Height) &&
+		pos_y < float32(battle_field.Height) {
 		return true
 	}
 
@@ -143,6 +190,7 @@ func (battle_field *BattleField) Within(pos_x float32, pos_y float32) bool {
 }
 
 type Actor struct {
+	Name     string
 	Pos      common.Vector3
 	Scale    common.Vector3
 	Extent   common.Vector3
@@ -150,12 +198,13 @@ type Actor struct {
 }
 
 type Scene struct {
+	Name   string
 	Actors []Actor
 }
 
 func (battle_field *BattleField) LoadProps(filename string) {
 	var props []*StaticUnit
-
+	var route []vec3.T
 	// Json file
 	file_handle, err := os.Open(filename)
 	if err != nil {
@@ -202,8 +251,12 @@ func (battle_field *BattleField) LoadProps(filename string) {
 			prop.Rotation[1] = v.Rotation.X
 			prop.Rotation[2] = v.Rotation.Y
 			prop.Rotation[3] = v.Rotation.Z
+			if strings.Contains(v.Name, "ConeBrush") {
+				route = append(route, prop.Pos)
+			} else {
+				props = append(props, &prop)
+			}
 
-			props = append(props, &prop)
 		}
 
 	} else {
@@ -211,6 +264,7 @@ func (battle_field *BattleField) LoadProps(filename string) {
 	}
 
 	battle_field.Props = props
+	battle_field.Route = route
 }
 
 func (battle_field *BattleField) LoadMap(filename string) []BaseFunc {

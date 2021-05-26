@@ -107,6 +107,8 @@ type BaseInfo struct {
 	velocity            vec3.T
 	position            vec3.T
 	direction           vec3.T
+	view_dir            vec3.T
+	fov                 float32
 	view_range          float32 // In meters
 	attack_range        float32 // In meters
 	attack_freq         float64 // Time gap between two attacks, in seconds
@@ -120,6 +122,8 @@ type BaseInfo struct {
 	buffs               map[int32]*Buff
 	name                string
 	extent              vec3.T
+	view_frustum        [4]vec3.T
+	view_depth          [10000]float32
 }
 
 type BaseFunc interface {
@@ -131,8 +135,17 @@ type BaseFunc interface {
 	Direction() vec3.T
 	SetDirection(direction vec3.T)
 
+	Viewdir() vec3.T
+	SetViewdir(direction vec3.T)
+
+	ViewFrustum() []vec3.T
+	ViewDepth() []float32
+
 	Extent() vec3.T
 	SetExtent(extent vec3.T)
+
+	Fov() float32 // In meters
+	SetFov(val float32)
 
 	ViewRange() float32 // In meters
 	SetViewRange(val float32)
@@ -205,6 +218,14 @@ func (baseinfo *BaseInfo) Position() vec3.T {
 	return baseinfo.position
 }
 
+func (baseinfo *BaseInfo) ViewFrustum() []vec3.T {
+	return baseinfo.view_frustum[:]
+}
+
+func (baseinfo *BaseInfo) ViewDepth() []float32 {
+	return baseinfo.view_depth[:]
+}
+
 func (baseinfo *BaseInfo) Direction() vec3.T {
 	return baseinfo.direction
 }
@@ -213,12 +234,28 @@ func (baseinfo *BaseInfo) SetDirection(direction vec3.T) {
 	baseinfo.direction = direction
 }
 
+func (baseinfo *BaseInfo) Viewdir() vec3.T {
+	return baseinfo.view_dir
+}
+
+func (baseinfo *BaseInfo) SetViewdir(direction vec3.T) {
+	baseinfo.view_dir = direction
+}
+
 func (baseinfo *BaseInfo) Extent() vec3.T {
 	return baseinfo.extent
 }
 
 func (baseinfo *BaseInfo) SetExtent(extent vec3.T) {
 	baseinfo.extent = extent
+}
+
+func (baseinfo *BaseInfo) Fov() float32 {
+	return baseinfo.fov
+}
+
+func (baseinfo *BaseInfo) SetFov(val float32) {
+	baseinfo.fov = val
 }
 
 func (baseinfo *BaseInfo) AttackRange() float32 {
@@ -376,6 +413,8 @@ func (baseinfo *BaseInfo) Copy(src BaseFunc) {
 	baseinfo.SetId(src.GetId())
 	baseinfo.SetName(src.Name())
 	baseinfo.SetExtent(src.Extent())
+	baseinfo.SetViewdir(src.Viewdir())
+	baseinfo.SetFov(src.Fov())
 }
 
 type JsonInfo struct {
@@ -386,6 +425,7 @@ type JsonInfo struct {
 	Stub1       float32
 	Speed       float32
 	ViewRange   float32
+	Fov         float32
 	Id          int32
 	Skills      []int32
 	Name        string
@@ -424,6 +464,7 @@ func (baseinfo *BaseInfo) InitFromJson(cfg_name string) bool {
 		baseinfo.speed = jsoninfo.Speed
 		baseinfo.view_range = jsoninfo.ViewRange
 		baseinfo.type_id = jsoninfo.Id
+		baseinfo.fov = jsoninfo.Fov
 
 	} else {
 		file_handle.Close()

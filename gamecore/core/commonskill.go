@@ -582,26 +582,35 @@ func NormalAttackEnemy(hero BaseFunc, enemy BaseFunc) {
 
 func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 	pos := hero.Position()
+	game := &GameInst
 
 	// Check milestone distance
 	targetPos := pos_enemy
-	dist := vec3.Distance(&pos, &targetPos)
-	if dist < 4 {
 
-	} else {
-		// March towards enemy pos
-		dir := hero.Direction()
-		dir = dir.Scaled(float32(gap_time))
-		dir = dir.Scaled(float32(hero.Speed()))
-		newPos := vec3.Add(&pos, &dir)
-		hero.SetPosition(newPos)
+	// March towards enemy pos
+	dir := hero.Direction()
+	dir = dir.Scaled(float32(gap_time))
+	dir = dir.Scaled(float32(hero.Speed()))
+	newPos := vec3.Add(&pos, &dir)
+	LogStr(fmt.Sprintf("Chase is called, newPos:[%v, %v]", newPos[0], newPos[1]))
 
-		// Calculate new direction
-		dir = targetPos
-		dir.Sub(&newPos)
-		dir.Normalize()
-		hero.SetDirection(dir)
+	within := false
+	for _, v := range game.BattleField.Props {
+		within = v.CheckWithin(newPos)
+		if within {
+			break
+		}
 	}
+
+	if !within {
+		hero.SetPosition(newPos)
+	}
+
+	// Calculate new direction
+	dir = targetPos
+	dir.Sub(&newPos)
+	dir.Normalize()
+	hero.SetDirection(dir)
 
 }
 
