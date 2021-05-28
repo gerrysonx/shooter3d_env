@@ -186,6 +186,12 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 
 		born_area_side_width := float64(testconfig.SpawnAreaWidth)
 
+		/*for _, v := range game.BattleField.Props {
+			pos := vec3.T{237.38586, 257.19244, 10}
+			within := v.CheckWithin(pos)
+			LogStr(fmt.Sprintf("In Wall: %v", within))
+		}*/
+
 		// Self heroes count
 		self_heroes_count := len(testconfig.SelfHeroes)
 		oppo_heroes_count := len(testconfig.OppoHeroes)
@@ -193,10 +199,13 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		for idx := 0; idx < self_heroes_count; idx += 1 {
 			rand_pos := get_rand_pos2(float32(born_area_side_width))
 			rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
-
+			LogStr(fmt.Sprintf("Spawn Locations: %f, %f", rand_num_1, rand_num_2))
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
 				float32(rand_num_1),
 				float32(rand_num_2))
+			/*self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
+			float32(192.094162),
+			float32(-292.574493))*/
 			self_hero.SetDirection(vec3.T{float32(-rand_num_1), float32(-rand_num_2), 0})
 
 			game.BattleUnits = append(game.BattleUnits, self_hero)
@@ -496,6 +505,7 @@ func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, act
 	case 1:
 		// move
 		dir := ConvertNum2Dir(action_code_1)
+		LogStr(fmt.Sprintf("Input Direction: %v", dir))
 		offset_x = dir[0]
 		offset_y = dir[1]
 		target_pos_x := float32(cur_pos[0] + offset_x)
@@ -506,6 +516,8 @@ func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, act
 		if is_target_within {
 			LogStr(fmt.Sprintf("AI:%v move is called, target pos from (%v, %v) to (%v, %v)", player_idx, cur_pos[0], cur_pos[1], target_pos_x, target_pos_y))
 			battle_unit.(HeroFunc).SetTargetPos(target_pos_x, target_pos_y)
+			dir.Normalize()
+			battle_unit.SetDirection(dir)
 		}
 
 	case 2:

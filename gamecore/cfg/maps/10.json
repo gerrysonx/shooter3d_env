@@ -5,7 +5,7 @@
 	"Restricted_h" : 200,
 	"SelfHeroes" : [2002],
 	"OppoHeroes" : [2004],
-	"SpawnAreaWidth" : 350,
+	"SpawnAreaWidth" : 450,
     "Width" : 450,
     "Height" : 450,
     "DepthMapSize" : 32,

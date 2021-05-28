@@ -106,6 +106,8 @@ func GetCollidePos(start vec3.T, pos vec3.T, tri []float32) (vec3.T, float32, bo
 
 func (unit *StaticUnit) CheckWithin(pos vec3.T) bool {
 	// First, check if pos is within AABB
+	//LogStr(fmt.Sprintf("Bullet: %v, Xmin: %v, Xmax: %v, Ymin: %v, Ymax: %v, Zmin: %v, Zmax: %v", pos, unit.BB.Xmin, unit.BB.Xmax, unit.BB.Ymin, unit.BB.Ymax, unit.BB.Zmin, unit.BB.Zmax))
+	//LogStr(fmt.Sprintf("Vertices: %v", unit.Vertice))
 	if pos[0] > unit.BB.Xmin &&
 		pos[0] < unit.BB.Xmax &&
 		pos[1] > unit.BB.Ymin &&
@@ -116,7 +118,7 @@ func (unit *StaticUnit) CheckWithin(pos vec3.T) bool {
 	} else {
 		return false
 	}
-
+	LogStr("AABB Check Passed")
 	// Second, check if pos -> unit-center direction collision with triangle point, and to determin if it's within
 	_tri_data_len := 15
 	tri_count := len(unit.Vertice) / _tri_data_len
@@ -251,6 +253,38 @@ func (battle_field *BattleField) LoadProps(filename string) {
 			prop.Rotation[1] = v.Rotation.X
 			prop.Rotation[2] = v.Rotation.Y
 			prop.Rotation[3] = v.Rotation.Z
+
+			common.UpdatePosWithRotation(&prop.Vertice, prop.Pos, prop.Extent, prop.Rotation)
+
+			LogStr(fmt.Sprintf("vertices: %v", prop.Vertice))
+
+			for i := 0; i < len(prop.Vertice); i++ {
+
+				switch i % 5 {
+				case 0:
+					if prop.Vertice[i] < prop.BB.Xmin {
+						prop.BB.Xmin = prop.Vertice[i]
+					}
+					if prop.Vertice[i] > prop.BB.Xmax {
+						prop.BB.Xmax = prop.Vertice[i]
+					}
+				case 1:
+					if prop.Vertice[i] < prop.BB.Ymin {
+						prop.BB.Ymin = prop.Vertice[i]
+					}
+					if prop.Vertice[i] > prop.BB.Ymax {
+						prop.BB.Ymax = prop.Vertice[i]
+					}
+				case 2:
+					if prop.Vertice[i] < prop.BB.Zmin {
+						prop.BB.Zmin = prop.Vertice[i]
+					}
+					if prop.Vertice[i] > prop.BB.Zmax {
+						prop.BB.Zmax = prop.Vertice[i]
+					}
+				}
+			}
+
 			if strings.Contains(v.Name, "ConeBrush") {
 				route = append(route, prop.Pos)
 			} else {

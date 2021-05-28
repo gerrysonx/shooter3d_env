@@ -68,11 +68,13 @@ func main() {
 	}
 
 	defer file_handle.Close()
+
 	if *_debug_log {
 		core.LogHandle = file_handle
 	} else {
 		core.LogHandle = nil
 	}
+	//core.LogHandle = file_handle
 	flag.Parse()
 	core.LogStr(fmt.Sprintf("main is called"))
 
@@ -166,7 +168,7 @@ func main() {
 
 				if *_slow_tick {
 					gap_time_in_nanoseconds := *_target_frame_gap_time * float64(time.Second)
-					time.Sleep(time.Duration(gap_time_in_nanoseconds) * 2)
+					time.Sleep(time.Duration(gap_time_in_nanoseconds) * 10) // was two
 				}
 			}
 
