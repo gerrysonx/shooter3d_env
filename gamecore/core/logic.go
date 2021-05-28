@@ -113,6 +113,39 @@ type TestConfig struct {
 	DepthMapSize   int
 }
 
+func get_rand_pos(dist float32) []float32 {
+	var rand_pos [2]float32
+	_seed := rand.Float32() * math.Pi * 2
+	rand_num_1 := math.Cos(float64(_seed)) * float64(dist)
+	rand_num_2 := math.Sin(float64(_seed)) * float64(dist)
+	rand_pos[0] = float32(rand_num_1)
+	rand_pos[1] = float32(rand_num_2)
+	return rand_pos[:]
+}
+
+func get_rand_pos2(dist float32) []float32 {
+	var rand_pos [2]float32
+	rand_section_idx := rand.Int31n(4)
+	var rand_radiant float32
+	rand_radiant = rand.Float32() * math.Pi / 6.0
+	switch rand_section_idx {
+	case 0:
+		rand_radiant += 0.17 * math.Pi
+	case 1:
+		rand_radiant += 0.67 * math.Pi
+	case 2:
+		rand_radiant += 1.17 * math.Pi
+	case 3:
+		rand_radiant += 1.67 * math.Pi
+	}
+
+	rand_num_1 := math.Cos(float64(rand_radiant)) * float64(dist)
+	rand_num_2 := math.Sin(float64(rand_radiant)) * float64(dist)
+	rand_pos[0] = float32(rand_num_1)
+	rand_pos[1] = float32(rand_num_2)
+	return rand_pos[:]
+}
+
 func (game *Game) LoadTestCase(test_cfg_name string) {
 	root_dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
 	if err != nil {
@@ -148,7 +181,8 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 			Height:       int32(testconfig.Height)}
 
 		game.DepthMapSize = testconfig.DepthMapSize
-		game.BattleField.LoadProps("/home/gerrysun/work/ue/test/a.txt")
+		full_map_cfg_name := fmt.Sprintf("%s/cfg/maps/%s", root_dir, "a.txt")
+		game.BattleField.LoadProps(full_map_cfg_name)
 
 		born_area_side_width := float64(testconfig.SpawnAreaWidth)
 
@@ -157,9 +191,9 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		oppo_heroes_count := len(testconfig.OppoHeroes)
 
 		for idx := 0; idx < self_heroes_count; idx += 1 {
-			_seed := rand.Float32() * math.Pi * 2
-			rand_num_1 := math.Cos(float64(_seed)) * born_area_side_width
-			rand_num_2 := math.Sin(float64(_seed)) * born_area_side_width
+			rand_pos := get_rand_pos2(float32(born_area_side_width))
+			rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
+
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
 				float32(rand_num_1),
 				float32(rand_num_2))
