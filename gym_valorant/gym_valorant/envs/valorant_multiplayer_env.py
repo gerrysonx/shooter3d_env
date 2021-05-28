@@ -111,7 +111,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         my_env['TF_CPP_MIN_LOG_LEVEL'] = '3'
         gamecore_file_path = '{}/../../../gamecore/gamecore'.format(root_folder)
         self.proc = subprocess.Popen([gamecore_file_path, 
-                                '-render=false', '-gym_mode=true', '-debug_log=false', '-slow_tick=true', 
+                                '-render=true', '-gym_mode=true', '-debug_log=false', '-slow_tick=true', 
                                 '-multi_player=true', '-scene={}'.format(scene_id), manual_str],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
