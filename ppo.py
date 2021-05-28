@@ -217,13 +217,20 @@ class MultiPlayer_Data_Generator():
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1
-            if new or step_info.step_idx > 600:
-                if False:#cur_ep_unclipped_ret == 0:
+            if new or step_info.step_idx > 300:
+                if new:#cur_ep_unclipped_ret == 0:
                     pass
                 else:
-                    ep_rets.append(cur_ep_ret)
-                    ep_unclipped_rets.append(cur_ep_unclipped_ret)
-                    ep_lens.append(cur_ep_len)
+                    # If time expired with no kill, we give it some punishment
+                    expire_punish = -1
+                    cur_ep_ret += expire_punish
+                    cur_ep_unclipped_ret += expire_punish
+                    rews[i] = True
+
+                ep_rets.append(cur_ep_ret)
+                ep_unclipped_rets.append(cur_ep_unclipped_ret)
+                ep_lens.append(cur_ep_len)
+
                 cur_ep_ret = 0
                 cur_ep_unclipped_ret = 0
                 cur_ep_len = 0
