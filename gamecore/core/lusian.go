@@ -1,7 +1,7 @@
 package core
 
 import (
-	"./nn"
+	//"./nn"
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -17,7 +17,7 @@ type PrivateMap struct {
 
 type Lusian struct {
 	Hero
-	nn.Model
+	//nn.Model
 	action_type      uint8
 	last_inference   float64
 	inference_gap    float64

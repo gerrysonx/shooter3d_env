@@ -44,7 +44,7 @@ BATCH_SCALE = 8
 BATCH_SIZE = 64 * BATCH_SCALE
 EPOCH_NUM = 4
 LEARNING_RATE = 8e-4
-TIMESTEPS_PER_ACTOR_BATCH = 2048 * BATCH_SCALE
+TIMESTEPS_PER_ACTOR_BATCH = 2048 #2048 * BATCH_SCALE
 GAMMA = 0.99
 LAMBDA = 0.95
 NUM_STEPS = 5000
@@ -217,7 +217,7 @@ class MultiPlayer_Data_Generator():
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1
-            if new or step_info.step_idx > 300:
+            if new or step_info.step_idx > 10:
                 if new:#cur_ep_unclipped_ret == 0:
                     pass
                 else:
@@ -226,7 +226,7 @@ class MultiPlayer_Data_Generator():
                     cur_ep_ret += expire_punish
                     cur_ep_unclipped_ret += expire_punish
                     rews[i] = True
-
+                print(cur_ep_ret)
                 ep_rets.append(cur_ep_ret)
                 ep_unclipped_rets.append(cur_ep_unclipped_ret)
                 ep_lens.append(cur_ep_len)
@@ -670,7 +670,7 @@ class MultiPlayerAgent():
     def learn_one_traj(self, timestep, seg):
         lens, rets, unclipped_rets = np.array(seg["ep_lens"]), np.array(seg["ep_rets"]), np.array(seg["ep_unclipped_rets"])
         ob, ac, atarg, tdlamret, depth = np.array(seg["ob"]), np.array(seg["ac"]), np.array(seg["std_atvtg"]), np.array(seg["tdlamret"]), np.array(seg['depth'])
-
+        print("reward: ", rets)
         self.session.run(self.update_policy_net_op)
 
         lrmult = max(1.0 - float(timestep) / self.num_total_steps, .0)

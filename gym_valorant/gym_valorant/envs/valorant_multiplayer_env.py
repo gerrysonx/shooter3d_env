@@ -101,8 +101,8 @@ class ValorantMultiPlayerEnv(gym.Env):
         root_folder = os.path.split(os.path.abspath(__file__))[0]
 
         my_env = os.environ.copy()
-        is_train = my_env['moba_env_is_train'] == 'True'
-        scene_id = my_env['moba_env_scene_id']    
+        is_train = True #my_env['moba_env_is_train'] == 'True'
+        scene_id = 10 #my_env['moba_env_scene_id']    
         
         manual_str = '-manual_enemy=false'
         if not is_train:
@@ -111,7 +111,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         my_env['TF_CPP_MIN_LOG_LEVEL'] = '3'
         gamecore_file_path = '{}/../../../gamecore/gamecore'.format(root_folder)
         self.proc = subprocess.Popen([gamecore_file_path, 
-                                '-render=true', '-gym_mode=true', '-debug_log=false', '-slow_tick=true', 
+                                '-render=false', '-gym_mode=true', '-debug_log=false', '-slow_tick=false', 
                                 '-multi_player=true', '-scene={}'.format(scene_id), manual_str],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
