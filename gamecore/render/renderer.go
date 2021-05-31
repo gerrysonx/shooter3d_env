@@ -563,7 +563,7 @@ func (renderer *Renderer) Render() {
 
 	for _, v := range renderer.game.BattleField.Props {
 		actor := renderer.actors[9999]
-		actor.DrawStatic(v)
+		actor.DrawStatic(v) //problematic
 	}
 
 	// 1. Actors

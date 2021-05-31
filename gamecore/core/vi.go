@@ -29,7 +29,6 @@ func (hero *Vi) HandleAICommand(gap_time float64) {
 		NormalAttackEnemy(hero, enemy)
 	} else {
 		if !pos_ready {
-
 			Chase(hero, targetPos, gap_time)
 		}
 
@@ -39,7 +38,10 @@ func (hero *Vi) HandleAICommand(gap_time float64) {
 func (hero *Vi) Tick(gap_time float64) {
 	// Used for AI control
 	game := &GameInst
+	targetPos := hero.TargetPos()
+	//LogStr(fmt.Sprintf("target pos: %v, %v", targetPos[0], targetPos[1]))
 	hero.HandleAICommand(gap_time)
+
 	//	hero.ManualCtrl(gap_time)
 	return
 
@@ -50,7 +52,7 @@ func (hero *Vi) Tick(gap_time float64) {
 
 	pos := hero.Position()
 	// Check milestone distance
-	targetPos := hero.TargetPos()
+	//targetPos := hero.TargetPos()
 	dist := vec3.Distance(&pos, &targetPos)
 	pos_ready := false
 	if dist < 4 {
@@ -66,6 +68,7 @@ func (hero *Vi) Tick(gap_time float64) {
 		if pos_ready {
 			// Do nothing
 		} else {
+			LogStr("Possible 2")
 			Chase(hero, targetPos, gap_time)
 		}
 	}

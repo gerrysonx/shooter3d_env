@@ -569,6 +569,7 @@ func NormalAttackEnemy(hero BaseFunc, enemy BaseFunc) {
 		dir_b := hero.Position()
 		dir := vec3.Sub(&dir_a, &dir_b)
 		bullet := HeroMgrInst.Spawn(int32(UnitTypeBullet), hero.Camp(), hero.Position()[0], hero.Position()[1])
+		LogStr("Bullet initialized")
 		dir.Normalize()
 		bullet.SetDirection(dir)
 		bullet.SetDamage(hero.Damage())
@@ -583,16 +584,15 @@ func NormalAttackEnemy(hero BaseFunc, enemy BaseFunc) {
 func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 	pos := hero.Position()
 	game := &GameInst
-
 	// Check milestone distance
 	targetPos := pos_enemy
 
 	// March towards enemy pos
 	dir := hero.Direction()
+	LogStr(fmt.Sprintf("hero dir: %v", dir))
 	dir = dir.Scaled(float32(gap_time))
 	dir = dir.Scaled(float32(hero.Speed()))
 	newPos := vec3.Add(&pos, &dir)
-	LogStr(fmt.Sprintf("Chase is called, newPos:[%v, %v]", newPos[0], newPos[1]))
 
 	within := false
 	for _, v := range game.BattleField.Props {
@@ -604,7 +604,10 @@ func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 
 	if !within {
 		hero.SetPosition(newPos)
+
 	}
+	pos = hero.Position()
+	LogStr(fmt.Sprintf("Chase is called, newPos:[%v, %v], Pos: [%v, %v]", newPos[0], newPos[1], pos[0], pos[1]))
 
 	// Calculate new direction
 	dir = targetPos

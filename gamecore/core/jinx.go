@@ -1,13 +1,13 @@
 package core
 
 import (
-	"./nn"
+	//"./nn"
 	"github.com/ungerik/go3d/vec3"
 )
 
 type Jinx struct {
 	Hero
-	nn.Model
+	//nn.Model
 	action_type    uint8
 	last_inference float64
 	inference_gap  float64
@@ -46,8 +46,8 @@ func (hero *Jinx) Tick(gap_time float64) {
 
 		// Update hero action type from nn
 		if (hero.last_inference + hero.inference_gap) < float64(now_seconds) {
-			game_state := game.GetGameState(true)
-			hero.action_type = hero.SampleAction(game_state)
+			//game_state := game.GetGameState(true)
+			hero.action_type = 0 //hero.SampleAction(game_state)
 			// fmt.Printf("max val idx is:%d, input:%v, output:%v, input_val:%v\n", max_idx, game.GetGameState(), predict[0], input_val)
 			hero.last_inference = now_seconds
 
