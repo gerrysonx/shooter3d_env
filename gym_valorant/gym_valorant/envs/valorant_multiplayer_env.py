@@ -111,7 +111,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         my_env['TF_CPP_MIN_LOG_LEVEL'] = '3'
         gamecore_file_path = '{}/../../../gamecore/gamecore'.format(root_folder)
         self.proc = subprocess.Popen([gamecore_file_path, 
-                                '-render=false', '-gym_mode=true', '-debug_log=true', '-slow_tick=false', 
+                                '-render=false', '-gym_mode=true', '-debug_log=false', '-slow_tick=false', 
                                 '-multi_player=true', '-scene={}'.format(scene_id), manual_str],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
@@ -182,7 +182,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         return total_self_hero_hp
 
     def get_harm_reward(self):
-        harm_reward = 0.2#0.00002
+        harm_reward = 0.02#0.00002
         hero_death_penalty = 0.2
         total_harm_reward = 0
         for hero_idx in range(self.self_hero_count):
