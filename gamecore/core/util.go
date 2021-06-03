@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"math"
 	"os"
 	"runtime"
@@ -411,10 +412,15 @@ func InitWithCamp(battle_unit BaseFunc, camp int32) {
 	}
 }
 
-func InitHeroWithCamp(battle_unit BaseFunc, camp int32, pos_x float32, pos_y float32) {
+func InitHeroWithCamp(battle_unit BaseFunc, camp int32, pos_x float32, pos_y float32, params ...float32) {
 	InitWithCamp(battle_unit, camp)
 	extent := battle_unit.Extent()
-	battle_unit.SetPosition(vec3.T{pos_x, pos_y, extent[2]})
+	LogStr(fmt.Sprintf("Extent: %v", extent))
+	if len(params) > 0 {
+		battle_unit.SetPosition(vec3.T{pos_x, pos_y, params[0]})
+	} else {
+		battle_unit.SetPosition(vec3.T{pos_x, pos_y, extent[2]})
+	}
 
 	hero_unit, ok := battle_unit.(HeroFunc)
 	if ok {

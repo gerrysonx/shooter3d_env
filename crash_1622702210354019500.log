@@ -1,0 +1,10 @@
+goroutine 1 [running, locked to thread]:
+main.main.func1(0xc00000c2c0, 0x3c)
+	C:/Users/haytamhuang/Documents/Update/shooter3d_env/gamecore/main.go:34 +0x73
+panic(0x5fde20, 0xc0003763a0)
+	c:/go/src/runtime/panic.go:679 +0x1c0
+_/C_/Users/haytamhuang/Documents/Update/shooter3d_env/gamecore/core.(*Game).HandleMultiPlayerAction(0x762360, 0x1, 0x1, 0x3, 0x0)
+	C:/Users/haytamhuang/Documents/Update/shooter3d_env/gamecore/core/logic.go:509 +0xb95
+main.main()
+	C:/Users/haytamhuang/Documents/Update/shooter3d_env/gamecore/main.go:155 +0xfa9
+

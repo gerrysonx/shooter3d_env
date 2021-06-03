@@ -104,6 +104,29 @@ func GetCollidePos(start vec3.T, pos vec3.T, tri []float32) (vec3.T, float32, bo
 
 }
 
+/*
+Check if the player's is blocked by the prop
+Parameter: player's position as vec3 vector, player's height
+Return: (if blocked by the prop, height for the step)
+*/
+func (unit *StaticUnit) collidesPlayer(pos vec3.T, height float32) (bool, float32) {
+	step := vec3.T{0, 0, -55}
+	step = vec3.Add(&pos, &step)
+	feet := vec3.Add(&pos, &vec3.T{0, 0, -height + 1})
+
+	if unit.CheckWithin(step) {
+		return true, 0
+	} else if unit.CheckWithin(feet) {
+		for !unit.CheckWithin(step) && step[2] > 0 {
+			step[2] -= 1
+			LogStr(fmt.Sprintf("height: %v", step[2]))
+		}
+		return false, step[2] - (pos[2] - height) + 1
+	} else {
+		return false, 0
+	}
+}
+
 func (unit *StaticUnit) CheckWithin(pos vec3.T) bool {
 	// First, check if pos is within AABB
 	//LogStr(fmt.Sprintf("Bullet: %v, Xmin: %v, Xmax: %v, Ymin: %v, Ymax: %v, Zmin: %v, Zmax: %v", pos, unit.BB.Xmin, unit.BB.Xmax, unit.BB.Ymin, unit.BB.Ymax, unit.BB.Zmin, unit.BB.Zmax))
@@ -118,7 +141,7 @@ func (unit *StaticUnit) CheckWithin(pos vec3.T) bool {
 	} else {
 		return false
 	}
-	LogStr("AABB Check Passed")
+	//LogStr("AABB Check Passed")
 	// Second, check if pos -> unit-center direction collision with triangle point, and to determin if it's within
 	_tri_data_len := 15
 	tri_count := len(unit.Vertice) / _tri_data_len
@@ -227,6 +250,7 @@ func (battle_field *BattleField) LoadProps(filename string) {
 			var prop StaticUnit
 			prop.Cached = false
 			prop.Name = fmt.Sprintf("prop_%d", _idx)
+			LogStr(v.Name)
 
 			prop.BB.Xmax = -math.MaxFloat32
 			prop.BB.Xmin = math.MaxFloat32
@@ -256,7 +280,7 @@ func (battle_field *BattleField) LoadProps(filename string) {
 
 			common.UpdatePosWithRotation(&prop.Vertice, prop.Pos, prop.Extent, prop.Rotation)
 
-			LogStr(fmt.Sprintf("vertices: %v", prop.Vertice))
+			//LogStr(fmt.Sprintf("vertices: %v", prop.Vertice))
 
 			for i := 0; i < len(prop.Vertice); i++ {
 
@@ -284,6 +308,8 @@ func (battle_field *BattleField) LoadProps(filename string) {
 					}
 				}
 			}
+
+			LogStr(fmt.Sprintf("AABB data: Xmin: %f, Xmax, %f, Ymin: %f, Ymax, %f, Zmin: %f, Zmax, %f", prop.BB.Xmin, prop.BB.Xmax, prop.BB.Ymin, prop.BB.Ymax, prop.BB.Zmin, prop.BB.Zmax))
 
 			if strings.Contains(v.Name, "ConeBrush") {
 				route = append(route, prop.Pos)

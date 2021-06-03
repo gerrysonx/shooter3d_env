@@ -2,6 +2,9 @@ package core
 
 import (
 	//"./nn"
+
+	"math"
+
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -50,8 +53,19 @@ func (hero *Lusian) PathSearching(gap_time float64) {
 		if canAttack {
 			NormalAttackEnemy(hero, enemy)
 		} else {
-			hero.MoveTowards(gap_time, pos_enemy)
+			//hero.MoveTowards(gap_time, pos_enemy)
 		}
+	} else {
+		//for !isEnemyNearby {
+		view_dir := hero.Direction()
+		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
+		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
+		//LogStr(fmt.Sprintf("length: %v, theta: %v", length, theta))
+		view_dir[0] = float32(math.Cos(theta+0.1) * length)
+		view_dir[1] = float32(math.Sin(theta+0.1) * length)
+		//LogStr(fmt.Sprintf("length: %v", math.Mod(float64(view_dir[0]), float64(view_dir[1]))))
+		hero.SetDirection(view_dir)
+		//}
 	}
 	/*
 		game := &GameInst

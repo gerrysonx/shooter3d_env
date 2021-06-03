@@ -568,7 +568,7 @@ func NormalAttackEnemy(hero BaseFunc, enemy BaseFunc) {
 		dir_a := enemy.Position()
 		dir_b := hero.Position()
 		dir := vec3.Sub(&dir_a, &dir_b)
-		bullet := HeroMgrInst.Spawn(int32(UnitTypeBullet), hero.Camp(), hero.Position()[0], hero.Position()[1])
+		bullet := HeroMgrInst.Spawn(int32(UnitTypeBullet), hero.Camp(), hero.Position()[0], hero.Position()[1], hero.Position()[2])
 		LogStr("Bullet initialized")
 		dir.Normalize()
 		bullet.SetDirection(dir)
@@ -595,19 +595,44 @@ func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 	newPos := vec3.Add(&pos, &dir)
 
 	within := false
+	drop := true
+	var step float32
+	feet := vec3.Add(&newPos, &vec3.T{0, 0, -hero.Extent()[2] - 1})
 	for _, v := range game.BattleField.Props {
-		within = v.CheckWithin(newPos)
+
+		within, step = v.collidesPlayer(newPos, hero.Extent()[2])
 		if within {
 			break
+		} else if step != 0 {
+			newPos[2] += step
+			LogStr(fmt.Sprintf("prop name: %v", v.Name))
+			LogStr(fmt.Sprintf("can step: %v", step))
 		}
+		if v.CheckWithin(feet) {
+			drop = false
+		}
+	}
+
+	if drop {
+		LogStr(fmt.Sprintf("drop!!!!!"))
+		for drop && feet[2] > -100 {
+			feet[2] -= 1
+			LogStr(fmt.Sprintf("drop: %v", feet[2]))
+			for _, v := range game.BattleField.Props {
+				if v.CheckWithin(feet) {
+					LogStr(fmt.Sprintf("drop to: %v", feet[2]))
+					drop = false
+					break
+				}
+			}
+		}
+		newPos[2] = feet[2] + hero.Extent()[2]
 	}
 
 	if !within {
 		hero.SetPosition(newPos)
-
+		LogStr(fmt.Sprintf("Chase is called, newPos:%v, Pos: %v", newPos, pos))
 	}
-	pos = hero.Position()
-	LogStr(fmt.Sprintf("Chase is called, newPos:[%v, %v], Pos: [%v, %v]", newPos[0], newPos[1], pos[0], pos[1]))
 
 	// Calculate new direction
 	dir = targetPos

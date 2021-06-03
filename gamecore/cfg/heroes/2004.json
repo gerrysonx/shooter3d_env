@@ -4,7 +4,7 @@
 	"attackRange" : 2000,
 	"viewRange" : 2000,
     "fov" : 60,
-	"health" : 300,
+	"health" : 200,
 	"damage" : 100,
 	"speed" : 400,
     "size" : 10,

@@ -251,7 +251,11 @@ func (heromgr *HeroMgr) Spawn(a ...interface{}) BaseFunc {
 
 	pos_x := a[2].(float32)
 	pos_y := a[3].(float32)
-	InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y)
+	if len(a) > 4 {
+		InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y, a[4].(float32))
+	} else {
+		InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y)
+	}
 
 	return (new_hero)
 }
