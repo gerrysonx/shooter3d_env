@@ -213,7 +213,10 @@ class MultiPlayer_Data_Generator():
             # rew = float(np.sign(unclipped_rew))
             rews[i] = rew
             unclipped_rews[i] = unclipped_rew
-            #print(t)
+            #if t % 500 == 0: 
+            #    print(t)
+            
+            
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1

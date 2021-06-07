@@ -631,7 +631,7 @@ func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 
 	if !within {
 		hero.SetPosition(newPos)
-		LogStr(fmt.Sprintf("Chase is called, newPos:%v, Pos: %v", newPos, pos))
+		LogStr(fmt.Sprintf("Chase is called, camp: %v, newPos:%v, Pos: %v", hero.Camp(), newPos, pos))
 	}
 
 	// Calculate new direction

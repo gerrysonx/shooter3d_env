@@ -3,6 +3,7 @@ package core
 import (
 	//"./nn"
 
+	"fmt"
 	"math"
 
 	"github.com/ungerik/go3d/vec3"
@@ -21,12 +22,13 @@ type PrivateMap struct {
 type Lusian struct {
 	Hero
 	//nn.Model
-	action_type      uint8
-	last_inference   float64
-	inference_gap    float64
-	private_map      *PrivateMap
-	now_route_target uint8
-	clockwise        bool
+	action_type       uint8
+	last_inference    float64
+	inference_gap     float64
+	private_map       *PrivateMap
+	now_route_target  uint8
+	clockwise         bool
+	enemyLastPosition vec3.T
 }
 
 func (hero *Lusian) MoveTowards(gap_time float64, pos_enemy vec3.T) {
@@ -45,6 +47,7 @@ func (hero *Lusian) PathSearching(gap_time float64) {
 
 	// Here we need to take blockage into account
 	isEnemyNearby, enemy := CheckEnemyInFrustum(hero.Camp(), hero)
+	LogStr(fmt.Sprintf("enemy last position: %v", hero.enemyLastPosition))
 	if isEnemyNearby {
 		pos_enemy := enemy.Position()
 		// Sometimes we cannot attack enemy that viewable to us
@@ -54,17 +57,32 @@ func (hero *Lusian) PathSearching(gap_time float64) {
 			NormalAttackEnemy(hero, enemy)
 		} else {
 			//hero.MoveTowards(gap_time, pos_enemy)
+			//Chase(hero, pos_enemy, gap_time)
+			//LogStr("Chase in sight")
+
 		}
+		hero.enemyLastPosition = enemy.Position()
 	} else {
-		//for !isEnemyNearby {
-		view_dir := hero.Direction()
-		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
-		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
-		//LogStr(fmt.Sprintf("length: %v, theta: %v", length, theta))
-		view_dir[0] = float32(math.Cos(theta+0.1) * length)
-		view_dir[1] = float32(math.Sin(theta+0.1) * length)
-		//LogStr(fmt.Sprintf("length: %v", math.Mod(float64(view_dir[0]), float64(view_dir[1]))))
-		hero.SetDirection(view_dir)
+		pos := hero.Position()
+		if vec3.Distance(&pos, &hero.enemyLastPosition) < 5 {
+			view_dir := hero.Direction()
+			length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
+			theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
+			view_dir[0] = float32(math.Cos(theta+0.1) * length)
+			view_dir[1] = float32(math.Sin(theta+0.1) * length)
+			hero.SetDirection(view_dir)
+		} else {
+			hero.MoveTowards(gap_time, hero.enemyLastPosition)
+			//LogStr("Chase not in sight")
+			/*
+				dir := hero.enemyLastPosition
+				dir.Sub(&pos)
+				dir.Normalize()
+				hero.SetDirection(dir)
+				Chase(hero, hero.enemyLastPosition, gap_time)*/
+
+		}
+
 		//}
 	}
 	/*

@@ -1,8 +1,6 @@
 package core
 
 import (
-	"fmt"
-
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -26,7 +24,7 @@ func (bullet *Bullet) Tick(gap_time float64) {
 	}
 
 	pos := bullet.Position()
-	LogStr(fmt.Sprintf("Bullet: %v", pos))
+	//LogStr(fmt.Sprintf("Bullet: %v", pos))
 	isEnemyNearby, enemy := CheckEnemyNearby(bullet.Camp(), bullet.AttackRange(), &pos)
 	if isEnemyNearby && enemy.GetId() != 0 {
 		// Check if time to make hurt
