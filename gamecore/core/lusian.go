@@ -47,7 +47,8 @@ func (hero *Lusian) PathSearching(gap_time float64) {
 
 	// Here we need to take blockage into account
 	isEnemyNearby, enemy := CheckEnemyInFrustum(hero.Camp(), hero)
-	LogStr(fmt.Sprintf("enemy last position: %v", hero.enemyLastPosition))
+	//LogStr(fmt.Sprintf("enemy last position: %v", hero.enemyLastPosition))
+	LogStr(fmt.Sprintf("Oppo ViewDir: %v", hero.Viewdir()))
 	if isEnemyNearby {
 		pos_enemy := enemy.Position()
 		// Sometimes we cannot attack enemy that viewable to us
@@ -65,12 +66,12 @@ func (hero *Lusian) PathSearching(gap_time float64) {
 	} else {
 		pos := hero.Position()
 		if vec3.Distance(&pos, &hero.enemyLastPosition) < 5 {
-			view_dir := hero.Direction()
+			view_dir := hero.Viewdir()
 			length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 			theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
 			view_dir[0] = float32(math.Cos(theta+0.1) * length)
 			view_dir[1] = float32(math.Sin(theta+0.1) * length)
-			hero.SetDirection(view_dir)
+			hero.SetViewdir(view_dir)
 		} else {
 			hero.MoveTowards(gap_time, hero.enemyLastPosition)
 			//LogStr("Chase not in sight")

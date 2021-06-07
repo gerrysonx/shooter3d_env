@@ -299,7 +299,7 @@ func CheckIfSeperated(hero BaseFunc, enemy BaseFunc) bool {
 }
 
 func CheckEnemyInFrustum(camp int32, hero BaseFunc) (bool, BaseFunc) {
-	view_dir := hero.Direction()
+	view_dir := hero.Viewdir()
 	if view_dir[0] == 0 {
 		return false, nil
 	}
@@ -321,7 +321,7 @@ func CheckEnemyInFrustum(camp int32, hero BaseFunc) (bool, BaseFunc) {
 			dist = vec3.Distance(&position, &unit_pos)
 			if dist < min_dist {
 				enemy_dir := vec3.Sub(&unit_pos, &position)
-				view_dir = hero.Direction()
+				view_dir = hero.Viewdir()
 				enemy_angle := vec3.Angle(&view_dir, &enemy_dir)
 				if enemy_angle < mgl32.DegToRad(hero.Fov()/2) {
 					// Check if the two objects are not seperated by Static objects

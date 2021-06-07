@@ -212,6 +212,7 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 			float32(-330),
 			float32(250))*/
 			self_hero.SetDirection(vec3.T{float32(-rand_num_1), float32(-rand_num_2), 0})
+			self_hero.SetViewdir(self_hero.Direction())
 			LogStr(fmt.Sprintf("Spawn Locations: %v", self_hero.Position()))
 
 			game.BattleUnits = append(game.BattleUnits, self_hero)
@@ -236,7 +237,7 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 			*/
 			oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1), float32(-10), float32(-10))
 			oppo_hero.SetDirection(vec3.T{self_hero_pos[0] + 10, self_hero_pos[1] + 10, 0})
-
+			oppo_hero.SetViewdir(oppo_hero.Direction())
 			game.BattleUnits = append(game.BattleUnits, oppo_hero)
 			game.OppoHeroes = append(game.OppoHeroes, oppo_hero.(HeroFunc))
 		}
@@ -570,6 +571,69 @@ func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, act
 		offset_y = dir[1]
 		battle_unit.(HeroFunc).UseSkill(3, offset_x, offset_y)
 
+	}
+}
+
+func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, action_code_1 int) {
+
+	battle_unit := game.SelfHeroes[player_idx].(BaseFunc)
+	view_dir := battle_unit.Viewdir()
+	if battle_unit.Health() <= 0 {
+		return
+	}
+	switch action_code_0 {
+	case 0: // do nothing
+		// Remain the same position
+
+	case 1:
+		// rotate left
+		//LogStr(fmt.Sprintf("Input Direction: %v", dir))
+		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
+		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
+		view_dir[0] = float32(math.Cos(theta-0.1) * length)
+		view_dir[1] = float32(math.Sin(theta-0.1) * length)
+		battle_unit.SetViewdir(view_dir)
+	case 2:
+		// rotate right
+		// Remain the same position
+		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
+		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
+		view_dir[0] = float32(math.Cos(theta-0.1) * length)
+		view_dir[1] = float32(math.Sin(theta-0.1) * length)
+		battle_unit.SetViewdir(view_dir)
+	}
+	switch action_code_1 {
+	case 0: // do nothing
+		// Remain the same position
+
+	case 1:
+		// rotate up
+
+		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
+		theta := math.Atan2(float64(view_dir[2]), length)
+		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
+		theta += 0.05
+		if theta > math.Pi-0.1 {
+			theta = math.Pi - 0.1
+		} else if theta < 0.1 {
+			theta = 0.1
+		}
+		view_dir[2] = float32(math.Tan(theta) * length)
+		battle_unit.SetViewdir(view_dir)
+	case 2:
+		// rotate down
+		// Remain the same position
+		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
+		theta := math.Atan2(float64(view_dir[2]), length)
+		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
+		theta -= 0.05
+		if theta > math.Pi-0.1 {
+			theta = math.Pi - 0.1
+		} else if theta < 0.1 {
+			theta = 0.1
+		}
+		view_dir[2] = float32(math.Tan(theta) * length)
+		battle_unit.SetViewdir(view_dir)
 	}
 }
 

@@ -11,7 +11,9 @@ ONE_HERO_FEATURE_SIZE = 5
 BATTLE_FIELD_SIZE = 1000.0
 MAIN_ACTION_DIMS = 3
 MOVE_DIMS = 8
-SKILL_DIMS = 8
+SKILL_DIMS = 3
+VISION_YAW_DIMS = 3
+VISION_PITCH_DIMS = 3
 DEPTH_MAP_SIZE = 30
 
 def FindHeroSkills(hero_cfg_file_path, hero_id):
@@ -74,7 +76,7 @@ def InitMetaConfig(scene_id):
         pass        
     pass
 
-    return (self_hero_count, obs_size), (self_hero_count, MAIN_ACTION_DIMS, MOVE_DIMS, SKILL_DIMS), self_hero_count, oppo_hero_count, dir_skill_mask
+    return (self_hero_count, obs_size), (self_hero_count, MAIN_ACTION_DIMS, MOVE_DIMS, SKILL_DIMS, VISION_YAW_DIMS, VISION_PITCH_DIMS), self_hero_count, oppo_hero_count, dir_skill_mask
 
 class ValorantEnvInfo(dict):
     def __init__(self, step_idx = 0):
@@ -111,7 +113,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         my_env['TF_CPP_MIN_LOG_LEVEL'] = '3'
         gamecore_file_path = '{}/../../../gamecore/gamecore'.format(root_folder)
         self.proc = subprocess.Popen([gamecore_file_path, 
-                                '-render=false', '-gym_mode=true', '-debug_log=false', '-slow_tick=false', 
+                                '-render=true', '-gym_mode=true', '-debug_log=false', '-slow_tick=true', 
                                 '-multi_player=true', '-scene={}'.format(scene_id), manual_str],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
@@ -231,7 +233,7 @@ class ValorantMultiPlayerEnv(gym.Env):
             else:
                 action_0 = action[0]
 
-            action_encode = (action_0 << 12)
+            action_encode = (action_0 << 16)
 
             move_dir_encode = 0
             action_1 = 0
@@ -242,7 +244,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 action_1 = action[1]
 
             if action_1 != -1:
-                move_dir_encode = (action_1 << 8)    
+                move_dir_encode = (action_1 << 12)    
 
             skill_dir_encode = 0
             action_2 = 0
@@ -253,11 +255,33 @@ class ValorantMultiPlayerEnv(gym.Env):
                 action_2 = action[2]
 
             if action[2] != -1:
-                skill_dir_encode = (action_2 << 4)
+                skill_dir_encode = (action_2 << 8)
+            
+            vision_dir_encode = 0
+            action_3 = 0
+            isarr = isinstance(action[3], np.ndarray)
+            if isarr:
+                action_3 = action[3][0] 
+            else:
+                action_3 = action[3]
 
-            encoded_action_val = (self.step_idx << 16) + action_encode + move_dir_encode + skill_dir_encode
+            if action[3] != -1:
+                vision_dir_encode = (action_3 << 4)
+
+            action_4 = 0
+            isarr = isinstance(action[4], np.ndarray)
+            if isarr:
+                action_4 = action[4][0] 
+            else:
+                action_4 = action[4]
+
+            if action[4] != -1:
+                vision_dir_encode = vision_dir_encode + (action_4 << 2)
+
+            encoded_action_val = (self.step_idx << 20) + action_encode + move_dir_encode + skill_dir_encode + vision_dir_encode
             self.proc.stdin.write('{}\n'.format(encoded_action_val).encode())
             self.proc.stdin.flush()
+            #print(encoded_action_val)
             
         # Wait for response.
         # Parse the state

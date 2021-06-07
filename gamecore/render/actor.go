@@ -198,7 +198,7 @@ func (actor *Actor) DrawStatic(f0 *core.StaticUnit) {
 }
 
 func (actor *Actor) Draw(f0 core.BaseFunc) {
-	dir := f0.Direction()
+	dir := f0.Viewdir()
 	dir.Normalize()
 	camp := f0.Camp()
 	// How to bind value?

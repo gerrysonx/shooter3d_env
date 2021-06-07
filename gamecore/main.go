@@ -110,6 +110,8 @@ func main() {
 		var action_code_0 int // action code
 		var action_code_1 int // move dir code
 		var action_code_2 int // skill dir code
+		var action_code_3 int // vision yaw code
+		var action_code_4 int // vision pitch code
 		for {
 			// Process input from user
 			if core.GameInst.LogicTime > _last_input_time+*_input_gap_time && *_gym_mode {
@@ -144,15 +146,19 @@ func main() {
 					for _idx := 0; _idx < player_count; _idx += 1 {
 						fmt.Scanf("%d\n", &action_code)
 
-						_action_stamp = action_code >> 16
-
-						action_code_0 = (action_code >> 12) & 0xf
-						action_code_1 = (action_code >> 8) & 0xf
-						action_code_2 = (action_code >> 4) & 0xf
+						_action_stamp = action_code >> 20
+						//core.LogStr(fmt.Sprintf("action: %v", action_code>>2))
+						action_code_0 = (action_code >> 16) & 0xf
+						action_code_1 = (action_code >> 12) & 0xf
+						action_code_2 = (action_code >> 8) & 0xf
+						action_code_3 = (action_code >> 4) & 0x3
+						action_code_4 = (action_code >> 2) & 0x3
 						// core.LogStr(fmt.Sprintf("_multi_player mode, player id:%d get action code:%v, action_code_0:%v, action_code_1:%v, action_code_2:%v",
 						// 	_idx, action_code, action_code_0, action_code_1, action_code_2))
-
+						//core.LogStr(fmt.Sprintf("action 3: %v, action 4: %v", action_code_3, action_code_4))
 						core.GameInst.HandleMultiPlayerAction(_idx, action_code_0, action_code_1, action_code_2)
+						core.GameInst.HandleMultiPlayerVision(_idx, action_code_3, action_code_4)
+						//core.GameInst.HandleMultiPlayerVision(_idx, 0, 1)
 
 						if 9 == action_code_0 {
 							// Instantly output
@@ -168,7 +174,7 @@ func main() {
 
 				if *_slow_tick {
 					gap_time_in_nanoseconds := *_target_frame_gap_time * float64(time.Second)
-					time.Sleep(time.Duration(gap_time_in_nanoseconds) * 10) // was two
+					time.Sleep(time.Duration(gap_time_in_nanoseconds) * 100) // was two
 				}
 			}
 
