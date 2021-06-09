@@ -53,15 +53,21 @@ type GameVarPlayerTrainState struct {
 	SelfHeroCount      int32
 	SelfHeroPosX       []float32
 	SelfHeroPosY       []float32
+	SelfHeroPosZ       []float32
 	SelfHeroHealth     []float32
 	SelfHeroHealthFull []float32
 	SelfHeroDepthMap   [][]float32
+	SelfHeroDirX       []float32
+	SelfHeroDirY       []float32
 
 	OppoHeroCount      int32
 	OppoHeroPosX       []float32
 	OppoHeroPosY       []float32
+	OppoHeroPosZ       []float32
 	OppoHeroHealth     []float32
 	OppoHeroHealthFull []float32
+	OppoHeroDirX       []float32
+	OppoHeroDirY       []float32
 
 	SlowBuffState      float32
 	SlowBuffRemainTime float32
@@ -130,13 +136,13 @@ func get_rand_pos2(dist float32) []float32 {
 	rand_radiant = rand.Float32() * math.Pi / 6.0
 	switch rand_section_idx {
 	case 0:
-		rand_radiant += 0.17 * math.Pi
+		rand_radiant += 0.3 * math.Pi
 	case 1:
-		rand_radiant += 0.67 * math.Pi
+		rand_radiant += 0.8 * math.Pi
 	case 2:
-		rand_radiant += 1.17 * math.Pi
+		rand_radiant += 1.2 * math.Pi
 	case 3:
-		rand_radiant += 1.67 * math.Pi
+		rand_radiant += 1.8 * math.Pi
 	}
 
 	rand_num_1 := math.Cos(float64(rand_radiant)) * float64(dist)
@@ -197,22 +203,26 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		oppo_heroes_count := len(testconfig.OppoHeroes)
 
 		for idx := 0; idx < self_heroes_count; idx += 1 {
-			rand_pos := get_rand_pos2(float32(born_area_side_width))
+			rand_pos := get_rand_pos(float32(born_area_side_width))
 			rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
-			LogStr(fmt.Sprintf("Spawn Locations: %f, %f", rand_num_1, rand_num_2))
+
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
 				float32(rand_num_1),
 				float32(rand_num_2))
+
 			/*self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
-			float32(192.094162),
-			float32(-292.574493))*/
+
+			float32(-330),
+			float32(250))*/
+
 			self_hero.SetDirection(vec3.T{float32(-rand_num_1), float32(-rand_num_2), 0})
+			LogStr(fmt.Sprintf("Spawn Locations: %v", self_hero.Position()))
 
 			game.BattleUnits = append(game.BattleUnits, self_hero)
 			game.SelfHeroes = append(game.SelfHeroes, self_hero.(HeroFunc))
 		}
 
-		// self_hero_pos := game.SelfHeroes[0].(BaseFunc).Position()
+		self_hero_pos := game.SelfHeroes[0].(BaseFunc).Position()
 		// Oppo heroes count
 		for idx := 0; idx < oppo_heroes_count; idx += 1 {
 			//	start_pos := (0 - born_area_side_width) / 2
@@ -229,6 +239,8 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 				oppo_hero.SetDirection(vec3.T{self_hero_pos[0] - oppo_hero_pos[0], self_hero_pos[1] - oppo_hero_pos[1], 0})
 			*/
 			oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1), float32(-10), float32(-10))
+			oppo_hero.SetDirection(vec3.T{self_hero_pos[0] + 10, self_hero_pos[1] + 10, 0})
+
 			game.BattleUnits = append(game.BattleUnits, oppo_hero)
 			game.OppoHeroes = append(game.OppoHeroes, oppo_hero.(HeroFunc))
 		}
@@ -375,6 +387,9 @@ func (game *Game) ClearGameStateData() {
 	game.var_player_train_state.SelfHeroCount = 0
 	game.var_player_train_state.SelfHeroPosX = game.var_player_train_state.SelfHeroPosX[:0]
 	game.var_player_train_state.SelfHeroPosY = game.var_player_train_state.SelfHeroPosY[:0]
+	//game.var_player_train_state.SelfHeroPosZ = game.var_player_train_state.SelfHeroPosZ[:0]
+	game.var_player_train_state.SelfHeroDirX = game.var_player_train_state.SelfHeroDirX[:0]
+	game.var_player_train_state.SelfHeroDirY = game.var_player_train_state.SelfHeroDirY[:0]
 	game.var_player_train_state.SelfHeroHealth = game.var_player_train_state.SelfHeroHealth[:0]
 	game.var_player_train_state.SelfHeroHealthFull = game.var_player_train_state.SelfHeroHealthFull[:0]
 	game.var_player_train_state.SelfHeroDepthMap = game.var_player_train_state.SelfHeroDepthMap[:0]
@@ -382,6 +397,9 @@ func (game *Game) ClearGameStateData() {
 	game.var_player_train_state.OppoHeroCount = 0
 	game.var_player_train_state.OppoHeroPosX = game.var_player_train_state.OppoHeroPosX[:0]
 	game.var_player_train_state.OppoHeroPosY = game.var_player_train_state.OppoHeroPosY[:0]
+	//game.var_player_train_state.OppoHeroPosZ = game.var_player_train_state.OppoHeroPosY[:0]
+	game.var_player_train_state.OppoHeroDirX = game.var_player_train_state.OppoHeroDirX[:0]
+	game.var_player_train_state.OppoHeroDirY = game.var_player_train_state.OppoHeroDirY[:0]
 	game.var_player_train_state.OppoHeroHealth = game.var_player_train_state.OppoHeroHealth[:0]
 	game.var_player_train_state.OppoHeroHealthFull = game.var_player_train_state.OppoHeroHealthFull[:0]
 }
@@ -399,6 +417,9 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		self_hero_unit := game.SelfHeroes[i].(BaseFunc)
 		game.var_player_train_state.SelfHeroPosX = append(game.var_player_train_state.SelfHeroPosX, self_hero_unit.Position()[0])
 		game.var_player_train_state.SelfHeroPosY = append(game.var_player_train_state.SelfHeroPosY, self_hero_unit.Position()[1])
+		//game.var_player_train_state.SelfHeroPosZ = append(game.var_player_train_state.SelfHeroPosY, self_hero_unit.Position()[2])
+		game.var_player_train_state.SelfHeroDirX = append(game.var_player_train_state.SelfHeroDirX, self_hero_unit.Direction()[0])
+		game.var_player_train_state.SelfHeroDirY = append(game.var_player_train_state.SelfHeroDirY, self_hero_unit.Direction()[1])
 		game.var_player_train_state.SelfHeroHealth = append(game.var_player_train_state.SelfHeroHealth, self_hero_unit.Health())
 		game.var_player_train_state.SelfHeroHealthFull = append(game.var_player_train_state.SelfHeroHealthFull, self_hero_unit.MaxHealth())
 
@@ -415,6 +436,9 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		oppo_hero_unit := game.OppoHeroes[i].(BaseFunc)
 		game.var_player_train_state.OppoHeroPosX = append(game.var_player_train_state.OppoHeroPosX, oppo_hero_unit.Position()[0])
 		game.var_player_train_state.OppoHeroPosY = append(game.var_player_train_state.OppoHeroPosY, oppo_hero_unit.Position()[1])
+		//game.var_player_train_state.OppoHeroPosZ = append(game.var_player_train_state.OppoHeroPosY, oppo_hero_unit.Position()[2])
+		game.var_player_train_state.OppoHeroDirX = append(game.var_player_train_state.OppoHeroDirX, oppo_hero_unit.Direction()[0])
+		game.var_player_train_state.OppoHeroDirY = append(game.var_player_train_state.OppoHeroDirY, oppo_hero_unit.Direction()[1])
 		game.var_player_train_state.OppoHeroHealth = append(game.var_player_train_state.OppoHeroHealth, oppo_hero_unit.Health())
 		game.var_player_train_state.OppoHeroHealthFull = append(game.var_player_train_state.OppoHeroHealthFull, oppo_hero_unit.MaxHealth())
 		if oppo_hero_unit.Health() > float32(0.0) {

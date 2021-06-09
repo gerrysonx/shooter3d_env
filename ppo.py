@@ -25,7 +25,7 @@ ONE_HOT_SIZE = 10
 # STATE_SIZE will be calculated from scene unit config
 STATE_SIZE = 0
 
-ONE_HERO_FEATURE_SIZE = 3
+ONE_HERO_FEATURE_SIZE = 5
 
 EMBED_SIZE = 5
 LAYER_SIZE = 128
@@ -43,8 +43,10 @@ NUM_FRAME_PER_ACTION = 4
 BATCH_SCALE = 8
 BATCH_SIZE = 64 * BATCH_SCALE
 EPOCH_NUM = 4
-LEARNING_RATE = 8e-4
-TIMESTEPS_PER_ACTOR_BATCH = 2048 #2048 * BATCH_SCALE
+
+LEARNING_RATE = 4e-4
+TIMESTEPS_PER_ACTOR_BATCH = 8192 #2048 * BATCH_SCALE
+
 GAMMA = 0.99
 LAMBDA = 0.95
 NUM_STEPS = 5000
@@ -65,7 +67,7 @@ g_out_tb = True
 # Control if train or play
 g_is_train = True
 # True means start a new train task without loading previous model.
-g_start_anew = False
+g_start_anew = True
 
 # Control if use priority sampling
 g_enable_per = False
@@ -213,16 +215,19 @@ class MultiPlayer_Data_Generator():
             # rew = float(np.sign(unclipped_rew))
             rews[i] = rew
             unclipped_rews[i] = unclipped_rew
-
+            #if t % 500 == 0: 
+            #    print(t)
+            
+            
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1
-            if new or step_info.step_idx > 100:
+            if new or step_info.step_idx > 250:
                 if new:#cur_ep_unclipped_ret == 0:
                     pass
                 else:
                     # If time expired with no kill, we give it some punishment
-                    expire_punish = -1
+                    expire_punish = -0.8
                     cur_ep_ret += expire_punish
                     cur_ep_unclipped_ret += expire_punish
                     rews[i] = True
@@ -764,7 +769,9 @@ def InitMetaConfig(scene_id):
 
 def GetDataGeneratorAndTrainer(scene_id):   
     InitMetaConfig(scene_id)
-    session = tf.Session()
+    config = tf.ConfigProto()
+    config.gpu_options.allow_growth = True
+    session = tf.Session(config = config)
     env = Environment()
     agent = MultiPlayerAgent(session, env)
     root_folder = os.path.split(os.path.abspath(__file__))[0]

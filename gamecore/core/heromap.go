@@ -1,9 +1,13 @@
 package core
 
-func GetHeroByName(name string) BaseFunc {
+import "github.com/ungerik/go3d/vec3"
+
+func GetHeroByName(name string, a ...float32) BaseFunc {
 	switch name {
 	case "lusian":
-		return new(Lusian)
+		lusian := new(Lusian)
+		lusian.enemyLastPosition = vec3.T{a[0], a[1], 80} //initialize the last position
+		return lusian
 	case "vi":
 		return new(Vi)
 	case "vayne":

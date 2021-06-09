@@ -240,8 +240,10 @@ func (heromgr *HeroMgr) LoadCfgFolder(config_file_folder string) {
 func (heromgr *HeroMgr) Spawn(a ...interface{}) BaseFunc {
 	hero_id := a[0].(int32)
 	wanted_camp := a[1].(int32)
+	pos_x := a[2].(float32)
+	pos_y := a[3].(float32)
 	hero_template := heromgr.heroes[hero_id]
-	new_hero := GetHeroByName(hero_template.name)
+	new_hero := GetHeroByName(hero_template.name, pos_x, pos_y)
 
 	new_hero.Copy(hero_template)
 	hero_unit, ok := new_hero.(HeroFunc)
@@ -249,9 +251,11 @@ func (heromgr *HeroMgr) Spawn(a ...interface{}) BaseFunc {
 		hero_unit.CopyHero(hero_template)
 	}
 
-	pos_x := a[2].(float32)
-	pos_y := a[3].(float32)
-	InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y)
+	if len(a) > 4 {
+		InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y, a[4].(float32))
+	} else {
+		InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y)
+	}
 
 	return (new_hero)
 }

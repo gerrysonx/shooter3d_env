@@ -1,8 +1,6 @@
 package core
 
 import (
-	"fmt"
-
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -26,7 +24,9 @@ func (bullet *Bullet) Tick(gap_time float64) {
 	}
 
 	pos := bullet.Position()
-	//LogStr(fmt.Sprintf("Bullet: [%v, %v]", pos[0], pos[1]))
+
+	//LogStr(fmt.Sprintf("Bullet: %v", pos))
+
 	isEnemyNearby, enemy := CheckEnemyNearby(bullet.Camp(), bullet.AttackRange(), &pos)
 	if isEnemyNearby && enemy.GetId() != 0 {
 		// Check if time to make hurt
@@ -37,14 +37,16 @@ func (bullet *Bullet) Tick(gap_time float64) {
 	} else {
 		// Check if the bullet is within a building
 		within := false
-		LogStr(fmt.Sprintf("Prop:"))
+
+		//LogStr(fmt.Sprintf("Prop:"))
 		for _, v := range game.BattleField.Props {
-			LogStr(fmt.Sprintf("Prop: %v", v))
+			//LogStr(fmt.Sprintf("Prop: %v", v))
 			within = v.CheckWithin(pos)
-			LogStr(fmt.Sprintf("Prop Within: %v", within))
+			//LogStr(fmt.Sprintf("Prop Within: %v", within))
 			if within {
 				bullet.SetHealth(0)
-				LogStr(fmt.Sprintf("Bullet: In a prop"))
+				//LogStr(fmt.Sprintf("Bullet: In a prop"))
+
 				return
 			}
 		}
