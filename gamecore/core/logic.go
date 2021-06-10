@@ -133,7 +133,7 @@ func get_rand_pos2(dist float32) []float32 {
 	var rand_pos [2]float32
 	rand_section_idx := rand.Int31n(4)
 	var rand_radiant float32
-	rand_radiant = rand.Float32() * math.Pi / 6.0
+	rand_radiant = rand.Float32() * math.Pi / 12.0
 	switch rand_section_idx {
 	case 0:
 		rand_radiant += 0.3 * math.Pi
@@ -203,7 +203,7 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		oppo_heroes_count := len(testconfig.OppoHeroes)
 
 		for idx := 0; idx < self_heroes_count; idx += 1 {
-			rand_pos := get_rand_pos(float32(born_area_side_width))
+			rand_pos := get_rand_pos2(float32(born_area_side_width))
 			rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
 				float32(rand_num_1),
@@ -415,8 +415,10 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		game.var_player_train_state.SelfHeroPosX = append(game.var_player_train_state.SelfHeroPosX, self_hero_unit.Position()[0])
 		game.var_player_train_state.SelfHeroPosY = append(game.var_player_train_state.SelfHeroPosY, self_hero_unit.Position()[1])
 		//game.var_player_train_state.SelfHeroPosZ = append(game.var_player_train_state.SelfHeroPosY, self_hero_unit.Position()[2])
-		game.var_player_train_state.SelfHeroDirX = append(game.var_player_train_state.SelfHeroDirX, self_hero_unit.Direction()[0])
-		game.var_player_train_state.SelfHeroDirY = append(game.var_player_train_state.SelfHeroDirY, self_hero_unit.Direction()[1])
+		viewdir := self_hero_unit.Viewdir()
+		viewdir.Normalize()
+		game.var_player_train_state.SelfHeroDirX = append(game.var_player_train_state.SelfHeroDirX, viewdir[0])
+		game.var_player_train_state.SelfHeroDirY = append(game.var_player_train_state.SelfHeroDirY, viewdir[1])
 		game.var_player_train_state.SelfHeroHealth = append(game.var_player_train_state.SelfHeroHealth, self_hero_unit.Health())
 		game.var_player_train_state.SelfHeroHealthFull = append(game.var_player_train_state.SelfHeroHealthFull, self_hero_unit.MaxHealth())
 
@@ -434,8 +436,10 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		game.var_player_train_state.OppoHeroPosX = append(game.var_player_train_state.OppoHeroPosX, oppo_hero_unit.Position()[0])
 		game.var_player_train_state.OppoHeroPosY = append(game.var_player_train_state.OppoHeroPosY, oppo_hero_unit.Position()[1])
 		//game.var_player_train_state.OppoHeroPosZ = append(game.var_player_train_state.OppoHeroPosY, oppo_hero_unit.Position()[2])
-		game.var_player_train_state.OppoHeroDirX = append(game.var_player_train_state.OppoHeroDirX, oppo_hero_unit.Direction()[0])
-		game.var_player_train_state.OppoHeroDirY = append(game.var_player_train_state.OppoHeroDirY, oppo_hero_unit.Direction()[1])
+		viewdir := oppo_hero_unit.Viewdir()
+		viewdir.Normalize()
+		game.var_player_train_state.OppoHeroDirX = append(game.var_player_train_state.OppoHeroDirX, viewdir[0])
+		game.var_player_train_state.OppoHeroDirY = append(game.var_player_train_state.OppoHeroDirY, viewdir[1])
 		game.var_player_train_state.OppoHeroHealth = append(game.var_player_train_state.OppoHeroHealth, oppo_hero_unit.Health())
 		game.var_player_train_state.OppoHeroHealthFull = append(game.var_player_train_state.OppoHeroHealthFull, oppo_hero_unit.MaxHealth())
 		if oppo_hero_unit.Health() > float32(0.0) {
@@ -590,16 +594,16 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 		//LogStr(fmt.Sprintf("Input Direction: %v", dir))
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
-		view_dir[0] = float32(math.Cos(theta-0.1) * length)
-		view_dir[1] = float32(math.Sin(theta-0.1) * length)
+		view_dir[0] = float32(math.Cos(theta-0.2) * length)
+		view_dir[1] = float32(math.Sin(theta-0.2) * length)
 		battle_unit.SetViewdir(view_dir)
 	case 2:
 		// rotate right
 		// Remain the same position
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
-		view_dir[0] = float32(math.Cos(theta-0.1) * length)
-		view_dir[1] = float32(math.Sin(theta-0.1) * length)
+		view_dir[0] = float32(math.Cos(theta+0.2) * length)
+		view_dir[1] = float32(math.Sin(theta+0.2) * length)
 		battle_unit.SetViewdir(view_dir)
 	}
 	switch action_code_1 {
@@ -612,11 +616,11 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[2]), length)
 		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
-		theta += 0.05
-		if theta > math.Pi-0.1 {
-			theta = math.Pi - 0.1
-		} else if theta < 0.1 {
-			theta = 0.1
+		theta += 0.01
+		if theta > math.Pi/2-1.5 {
+			theta = math.Pi/2 - 1.5
+		} else if theta < -math.Pi/2+1.5 {
+			theta = -math.Pi/2 + 1.5
 		}
 		view_dir[2] = float32(math.Tan(theta) * length)
 		battle_unit.SetViewdir(view_dir)
@@ -626,11 +630,11 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[2]), length)
 		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
-		theta -= 0.05
-		if theta > math.Pi-0.1 {
-			theta = math.Pi - 0.1
-		} else if theta < 0.1 {
-			theta = 0.1
+		theta -= 0.01
+		if theta > math.Pi/2-1.5 {
+			theta = math.Pi/2 - 1.5
+		} else if theta < -math.Pi/2+1.5 {
+			theta = -math.Pi/2 + 1.5
 		}
 		view_dir[2] = float32(math.Tan(theta) * length)
 		battle_unit.SetViewdir(view_dir)

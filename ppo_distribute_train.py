@@ -46,7 +46,7 @@ def get_one_step_data(timestep, work_thread_count):
     collected_all_data_files = False
     while not collected_all_data_files:
         for root, _, files in os.walk(data_folder_path):
-            if len(files) < work_thread_count:
+            if len(files) < work_thread_count / 3 * 2:
                 print('Already has {} files, waiting for the worker thread generate more data files.'.format(len(files)))
                 break
 

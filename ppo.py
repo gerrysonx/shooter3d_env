@@ -44,7 +44,7 @@ BATCH_SCALE = 8
 BATCH_SIZE = 64 * BATCH_SCALE
 EPOCH_NUM = 4
 LEARNING_RATE = 4e-4
-TIMESTEPS_PER_ACTOR_BATCH = 8192 #2048 * BATCH_SCALE
+TIMESTEPS_PER_ACTOR_BATCH = 16384 #2048 * BATCH_SCALE
 GAMMA = 0.99
 LAMBDA = 0.95
 NUM_STEPS = 5000
@@ -220,7 +220,7 @@ class MultiPlayer_Data_Generator():
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1
-            if new or step_info.step_idx > 250:
+            if new or step_info.step_idx > 150:
                 if new:#cur_ep_unclipped_ret == 0:
                     pass
                 else:

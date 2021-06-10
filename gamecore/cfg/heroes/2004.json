@@ -1,6 +1,6 @@
 {
 	"name" : "lusian",
-	"attackFreq" : 1,
+	"attackFreq" : 0.8,
 	"attackRange" : 2000,
 	"viewRange" : 2000,
     "fov" : 60,

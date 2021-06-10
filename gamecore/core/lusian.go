@@ -64,25 +64,25 @@ func (hero *Lusian) PathSearching(gap_time float64) {
 		}
 		hero.enemyLastPosition = enemy.Position()
 	} else {
-		pos := hero.Position()
-		if vec3.Distance(&pos, &hero.enemyLastPosition) < 5 {
-			view_dir := hero.Viewdir()
-			length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
-			theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
-			view_dir[0] = float32(math.Cos(theta+0.1) * length)
-			view_dir[1] = float32(math.Sin(theta+0.1) * length)
-			hero.SetViewdir(view_dir)
-		} else {
-			hero.MoveTowards(gap_time, hero.enemyLastPosition)
-			//LogStr("Chase not in sight")
-			/*
-				dir := hero.enemyLastPosition
-				dir.Sub(&pos)
-				dir.Normalize()
-				hero.SetDirection(dir)
-				Chase(hero, hero.enemyLastPosition, gap_time)*/
+		//pos := hero.Position()
+		//if vec3.Distance(&pos, &hero.enemyLastPosition) < 5 {
+		view_dir := hero.Viewdir()
+		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
+		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
+		view_dir[0] = float32(math.Cos(theta+0.05) * length)
+		view_dir[1] = float32(math.Sin(theta+0.05) * length)
+		hero.SetViewdir(view_dir)
+		//} else {
+		//hero.MoveTowards(gap_time, hero.enemyLastPosition)
+		//LogStr("Chase not in sight")
+		/*
+			dir := hero.enemyLastPosition
+			dir.Sub(&pos)
+			dir.Normalize()
+			hero.SetDirection(dir)
+			Chase(hero, hero.enemyLastPosition, gap_time)*/
 
-		}
+		//}
 
 		//}
 	}
