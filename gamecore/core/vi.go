@@ -1,6 +1,8 @@
 package core
 
 import (
+	"fmt"
+
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -22,6 +24,8 @@ func (hero *Vi) HandleAICommand(gap_time float64) {
 		// Already the last milestone
 		pos_ready = true
 	}
+
+	LogStr(fmt.Sprintf("self ViewDir: %v", hero.Viewdir()))
 
 	isEnemyNearby, enemy := CheckEnemyInFrustum(hero.Camp(), hero)
 	if isEnemyNearby {

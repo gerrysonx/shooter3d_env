@@ -74,7 +74,7 @@ def generate_data(scene_id):
 
 if __name__=='__main__':
     g_step = 0
-    scene_id = 13
+    scene_id = 10
     g_worker_id = 0
     TIMESTEPS_PER_ACTOR_BATCH = 2048
     if len(sys.argv) > 1:

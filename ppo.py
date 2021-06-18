@@ -45,7 +45,8 @@ BATCH_SIZE = 64 * BATCH_SCALE
 EPOCH_NUM = 4
 
 LEARNING_RATE = 4e-4
-TIMESTEPS_PER_ACTOR_BATCH = 8192 #2048 * BATCH_SCALE
+
+TIMESTEPS_PER_ACTOR_BATCH = 16384 #2048 * BATCH_SCALE
 
 GAMMA = 0.99
 LAMBDA = 0.95
@@ -159,7 +160,7 @@ class MultiPlayer_Data_Generator():
         t = 0
         ac = []
         for idx in range(HERO_COUNT):
-            ac.append([0, 0, 0])
+            ac.append([0, 0, 0, 0, 0])
 
         new = True # marks if we're on first timestep of an episode
         env_state = self.env.reset()
@@ -222,7 +223,7 @@ class MultiPlayer_Data_Generator():
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1
-            if new or step_info.step_idx > 250:
+            if new or step_info.step_idx > 150:
                 if new:#cur_ep_unclipped_ret == 0:
                     pass
                 else:
@@ -559,6 +560,7 @@ class MultiPlayerAgent():
 
                 a_prob = stable_softmax(a_logits, head_layer_name) #tf.nn.softmax(a_logits)
                 a_prob_arr.append(a_prob)
+
                 tf.summary.histogram(head_layer_name, a_prob)
 
             # value network
@@ -583,13 +585,16 @@ class MultiPlayerAgent():
         value_arr = []
 
         for hero_idx in range(HERO_COUNT):
-            tuple_val = self.session.run([self.value[hero_idx], self.a_policy_new[hero_idx][0], self.a_policy_new[hero_idx][1], self.a_policy_new[hero_idx][2]], 
+            tuple_val = self.session.run([self.value[hero_idx], self.a_policy_new[hero_idx][0], self.a_policy_new[hero_idx][1],\
+                                self.a_policy_new[hero_idx][2], self.a_policy_new[hero_idx][3], self.a_policy_new[hero_idx][4]], 
             feed_dict={self.multi_s: s, self.multi_d: depth})
             value = tuple_val[0]
             chosen_policy = tuple_val[1:]
             #chosen_policy = self.session.run(self.a_policy_new, feed_dict={self.s: s})
             
             actions = []
+            #print("\n\n\n\nchosen_policy")
+            #print(chosen_policy)
             for _idx in range(self.policy_head_num):
                 ac = np.random.choice(range(chosen_policy[_idx].shape[1]), p=chosen_policy[_idx][0])
                 actions.append(ac)

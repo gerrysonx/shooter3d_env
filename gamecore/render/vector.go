@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/go-gl/mathgl/mgl32"
@@ -11,16 +12,6 @@ import (
 	"github.com/ungerik/go3d/vec4"
 )
 
-/*
-func RotateVertWithQuat(vert []float32, rotation core.Vector4) {
-	var vertQuat core.Vector4
-	vertQuat.W = 0
-	vertQuat.X = vert[0]
-	vertQuat.Y = vert[1]
-	vertQuat.Z = vert[2]
-
-}
-*/
 func GetFarFaceFourPoints(vertice []float32, view_frustum []vec3.T) {
 	offset := 90
 	view_frustum[0][0] = vertice[offset+25]
@@ -583,25 +574,22 @@ func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T, f0 core.BaseFunc) {
 
 	// near far face size ratio
 	SetConeOffset(vertice, 0, 0, 0, unit_width, unit_height, unit_depth, far_face_ratio)
-	// Calculate the rotation quaternion b = dir, b*a^-1
-	theta := math.Acos(float64(dir[0]))
-	if dir[1] < 0 {
-		theta = math.Pi*2 - theta
-	}
 
 	var quatRotation common.Quaternion
+	core.LogStr(fmt.Sprintf("View Dir: %v", dir))
+	core.LogStr(fmt.Sprintf("Calculation: %v", math.Atan2(float64(dir[2]), float64(dir[0]))))
 
-	half_cos_theta := float32(math.Cos(theta / 2.0))
-	half_sin_theta := float32(math.Sin(theta / 2.0))
-	quatRotation.W = half_cos_theta
-	quatRotation.X = 0
-	quatRotation.Y = 0
-	quatRotation.Z = half_sin_theta
+	X := 0.0                                                                                     //math.Atan2(float64(dir[2]), math.Abs(float64(dir[1])))
+	Y := -math.Atan2(float64(dir[2]), math.Abs(math.Sqrt(float64(dir[0]*dir[0]+dir[1]*dir[1])))) // float64(dir[0])
+	Z := math.Atan2(float64(dir[1]), float64(dir[0]))
+	quatRotation.W = float32(math.Cos(Y/2)*math.Cos(Z/2)*math.Cos(X/2) + math.Sin(Y/2)*math.Sin(Z/2)*math.Sin(X/2))
+	quatRotation.X = float32(math.Cos(Y/2)*math.Cos(Z/2)*math.Sin(X/2) - math.Sin(Y/2)*math.Sin(Z/2)*math.Cos(X/2))
+	quatRotation.Y = float32(math.Sin(Y/2)*math.Cos(Z/2)*math.Cos(X/2) + math.Cos(Y/2)*math.Sin(Z/2)*math.Sin(X/2))
+	quatRotation.Z = float32(math.Cos(Y/2)*math.Sin(Z/2)*math.Cos(X/2) - math.Sin(Y/2)*math.Cos(Z/2)*math.Sin(X/2))
 
 	var quatRotationConjugate common.Quaternion
 	quatRotationConjugate.Copy(&quatRotation)
 	quatRotationConjugate.Conjugate()
-
 	PointSize := 5
 	for _idx := 0; _idx < 36; _idx++ {
 		var quatVert common.Quaternion
@@ -612,6 +600,7 @@ func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T, f0 core.BaseFunc) {
 		quatTmp.Multi(&quatRotationConjugate)
 		quatTmp.GetVert(vertice[_idx*PointSize : _idx*PointSize+3])
 	}
+
 	OffsetObject(vertice, x_new, y_new, z_new, 0, 0, 0)
 
 	GetFarFaceFourPoints(vertice, view_frustum)
