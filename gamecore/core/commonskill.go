@@ -563,21 +563,31 @@ func JumpTowardsEnemy(hero HeroFunc, a ...interface{}) {
 func NormalAttackEnemy(hero BaseFunc, enemy BaseFunc) {
 	game := &GameInst
 	now_seconds := game.LogicTime
-	if (hero.LastAttackTime() + hero.AttackFreq()) < float64(now_seconds) {
-		// Make damage
-		dir_a := enemy.Position()
-		dir_b := hero.Position()
-		dir := vec3.Sub(&dir_a, &dir_b)
-		bullet := HeroMgrInst.Spawn(int32(UnitTypeBullet), hero.Camp(), hero.Position()[0], hero.Position()[1], hero.Position()[2])
-		LogStr("Bullet initialized")
-		dir.Normalize()
-		bullet.SetDirection(dir)
-		bullet.SetDamage(hero.Damage())
-		bullet.SetLastAttackTime(game.LogicTime)
+	// hero.SetMagRemain(2)
+	if hero.GetMagRemain() > 0 {
+		if (hero.LastAttackTime() + hero.AttackFreq()) < float64(now_seconds) {
+			// Make damage
+			dir_a := enemy.Position()
+			dir_b := hero.Position()
+			dir := vec3.Sub(&dir_a, &dir_b)
+			bullet := HeroMgrInst.Spawn(int32(UnitTypeBullet), hero.Camp(), hero.Position()[0], hero.Position()[1], hero.Position()[2])
+			LogStr("Bullet initialized")
+			dir.Normalize()
+			bullet.SetDirection(dir)
+			bullet.SetDamage(hero.Damage())
+			bullet.SetLastAttackTime(game.LogicTime)
+			game.AddUnits = append(game.AddUnits, bullet)
 
-		game.AddUnits = append(game.AddUnits, bullet)
-
-		hero.SetLastAttackTime(now_seconds)
+			hero.SetLastAttackTime(now_seconds)
+			hero.MagDecrease()
+			if hero.GetMagRemain() == 0 {
+				hero.SetReloadStartTime(now_seconds)
+			}
+		}
+	} else {
+		if (hero.GetReloadStartTime() + hero.GetReloadTime()) < float64(now_seconds) {
+			hero.ResetMagRemain()
+		}
 	}
 }
 

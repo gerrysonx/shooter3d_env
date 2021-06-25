@@ -124,6 +124,11 @@ type BaseInfo struct {
 	extent              vec3.T
 	view_frustum        [4]vec3.T
 	view_depth          [10000]float32
+	bullet_num          uint32
+	mag_size            uint32
+	mag_remain          uint32
+	reload_start_time   float64
+	reload_time         float64
 }
 
 type BaseFunc interface {
@@ -193,6 +198,77 @@ type BaseFunc interface {
 
 	Copy(src BaseFunc)
 	Attackable() bool
+
+	SetMagRemain(val uint32)
+	GetMagRemain() uint32
+	ResetMagRemain()
+	MagDecrease()
+
+	GetMagSize() uint32
+	SetMagSize(val uint32)
+
+	GetBulletNum() uint32
+	SetBulletNum(val uint32)
+
+	GetReloadTime() float64
+	SetReloadTime(val float64)
+
+	GetReloadStartTime() float64
+	SetReloadStartTime(val float64)
+}
+
+func (baseinfo *BaseInfo) SetMagRemain(val uint32) {
+	baseinfo.mag_remain = val
+}
+
+func (baseinfo *BaseInfo) GetMagRemain() uint32 {
+	return baseinfo.mag_remain
+}
+
+func (baseinfo *BaseInfo) ResetMagRemain() {
+	if baseinfo.bullet_num >= baseinfo.mag_size {
+		baseinfo.mag_remain = baseinfo.mag_size
+		baseinfo.bullet_num -= baseinfo.mag_size
+	} else {
+		baseinfo.mag_remain = baseinfo.bullet_num
+		baseinfo.bullet_num = 0
+	}
+}
+
+func (baseinfo *BaseInfo) MagDecrease() {
+	baseinfo.mag_remain -= 1
+}
+
+func (baseinfo *BaseInfo) GetMagSize() uint32 {
+	return baseinfo.mag_size
+}
+
+func (baseinfo *BaseInfo) SetMagSize(val uint32) {
+	baseinfo.mag_size = val
+}
+
+func (baseinfo *BaseInfo) GetBulletNum() uint32 {
+	return baseinfo.bullet_num
+}
+
+func (baseinfo *BaseInfo) SetBulletNum(val uint32) {
+	baseinfo.bullet_num = val
+}
+
+func (baseinfo *BaseInfo) GetReloadTime() float64 {
+	return baseinfo.reload_time
+}
+
+func (baseinfo *BaseInfo) SetReloadTime(val float64) {
+	baseinfo.reload_time = val
+}
+
+func (baseinfo *BaseInfo) GetReloadStartTime() float64 {
+	return baseinfo.reload_start_time
+}
+
+func (baseinfo *BaseInfo) SetReloadStartTime(val float64) {
+	baseinfo.reload_start_time = val
 }
 
 func (baseinfo *BaseInfo) Attackable() bool {
@@ -415,6 +491,10 @@ func (baseinfo *BaseInfo) Copy(src BaseFunc) {
 	baseinfo.SetExtent(src.Extent())
 	baseinfo.SetViewdir(src.Viewdir())
 	baseinfo.SetFov(src.Fov())
+	baseinfo.SetMagRemain(src.GetMagSize())
+	baseinfo.SetMagSize(src.GetMagSize())
+	baseinfo.SetBulletNum(src.GetBulletNum())
+	baseinfo.SetReloadTime(src.GetReloadTime())
 }
 
 type JsonInfo struct {
@@ -430,6 +510,9 @@ type JsonInfo struct {
 	Skills      []int32
 	Name        string
 	Extent      []float32
+	MagSize     uint32
+	BulletNum   uint32
+	ReloadTime  float64
 }
 
 func (baseinfo *BaseInfo) InitFromJson(cfg_name string) bool {
@@ -465,6 +548,10 @@ func (baseinfo *BaseInfo) InitFromJson(cfg_name string) bool {
 		baseinfo.view_range = jsoninfo.ViewRange
 		baseinfo.type_id = jsoninfo.Id
 		baseinfo.fov = jsoninfo.Fov
+		baseinfo.mag_size = jsoninfo.MagSize
+		baseinfo.mag_remain = jsoninfo.MagSize
+		baseinfo.bullet_num = jsoninfo.BulletNum
+		baseinfo.reload_time = jsoninfo.ReloadTime
 
 	} else {
 		file_handle.Close()

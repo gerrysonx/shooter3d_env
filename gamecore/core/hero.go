@@ -137,6 +137,10 @@ func (hero *Hero) InitFromJson(full_path string, id int32) bool {
 		hero.type_id = id
 		hero.name = jsoninfo.Name
 		hero.fov = jsoninfo.Fov
+		hero.mag_size = jsoninfo.MagSize
+		hero.mag_remain = jsoninfo.MagSize
+		hero.bullet_num = jsoninfo.BulletNum
+		hero.reload_time = jsoninfo.ReloadTime
 
 		hero.extent[0] = jsoninfo.Extent[0]
 		hero.extent[1] = jsoninfo.Extent[1]
@@ -243,7 +247,13 @@ func (heromgr *HeroMgr) Spawn(a ...interface{}) BaseFunc {
 	pos_x := a[2].(float32)
 	pos_y := a[3].(float32)
 	hero_template := heromgr.heroes[hero_id]
-	new_hero := GetHeroByName(hero_template.name, pos_x, pos_y)
+	var pos_z float32
+	if len(a) > 4 {
+		pos_z = a[4].(float32)
+	} else {
+		pos_z = 80.0
+	}
+	new_hero := GetHeroByName(hero_template.name, pos_x, pos_y, pos_z)
 
 	new_hero.Copy(hero_template)
 	hero_unit, ok := new_hero.(HeroFunc)

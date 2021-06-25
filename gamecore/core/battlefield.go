@@ -110,7 +110,7 @@ Parameter: player's position as vec3 vector, player's height
 Return: (if blocked by the prop, height for the step)
 */
 func (unit *StaticUnit) collidesPlayer(pos vec3.T, height float32) (bool, float32) {
-	step := vec3.T{0, 0, -55}
+	step := vec3.T{0, 0, -45}
 	step = vec3.Add(&pos, &step)
 	feet := vec3.Add(&pos, &vec3.T{0, 0, -height + 1})
 

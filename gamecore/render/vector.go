@@ -636,7 +636,7 @@ func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T, f0 core.BaseFunc) {
 	core.LogStr(fmt.Sprintf("View Dir: %v", dir))
 	core.LogStr(fmt.Sprintf("Calculation: %v", math.Atan2(float64(dir[2]), float64(dir[0]))))
 	X := 0.0 //math.Atan2(float64(dir[2]), math.Abs(float64(dir[1])))
-	Y := -math.Atan2(float64(dir[2]), math.Abs(float64(dir[0])))
+	Y := -math.Atan2(float64(dir[2]), math.Sqrt(float64(dir[0]*dir[0]+dir[1]*dir[1])))
 	Z := math.Atan2(float64(dir[1]), float64(dir[0]))
 	quatRotation.W = float32(math.Cos(Y/2)*math.Cos(Z/2)*math.Cos(X/2) + math.Sin(Y/2)*math.Sin(Z/2)*math.Sin(X/2))
 	quatRotation.X = float32(math.Cos(Y/2)*math.Cos(Z/2)*math.Sin(X/2) - math.Sin(Y/2)*math.Sin(Z/2)*math.Cos(X/2))
