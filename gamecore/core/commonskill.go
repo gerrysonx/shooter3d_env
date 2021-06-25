@@ -603,21 +603,12 @@ func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 	dir = dir.Scaled(float32(gap_time))
 	dir = dir.Scaled(float32(hero.Speed()))
 	newPos := vec3.Add(&pos, &dir)
-
+	tmp := newPos
 	within := false
 	drop := true
 	var step float32
 	feet := vec3.Add(&newPos, &vec3.T{0, 0, -hero.Extent()[2] - 1})
 	for _, v := range game.BattleField.Props {
-
-		within, step = v.collidesPlayer(newPos, hero.Extent()[2])
-		if within {
-			break
-		} else if step != 0 {
-			newPos[2] += step
-			LogStr(fmt.Sprintf("prop name: %v", v.Name))
-			LogStr(fmt.Sprintf("can step: %v", step))
-		}
 		if v.CheckWithin(feet) {
 			drop = false
 		}
@@ -636,10 +627,23 @@ func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 				}
 			}
 		}
-		newPos[2] = feet[2] + hero.Extent()[2]
+		tmp[2] = feet[2] + hero.Extent()[2]
+	} else {
+		for _, v := range game.BattleField.Props {
+			within, step = v.collidesPlayer(newPos, hero.Extent()[2])
+			if within {
+				within = true
+				break
+			} else if step != 0 {
+				tmp = vec3.Add(&newPos, &vec3.T{0, 0, step})
+				LogStr(fmt.Sprintf("prop name: %v", v.Name))
+				LogStr(fmt.Sprintf("can step: %v", step))
+			}
+		}
 	}
 
 	if !within {
+		newPos = tmp
 		hero.SetPosition(newPos)
 		LogStr(fmt.Sprintf("Chase is called, camp: %v, newPos:%v, Pos: %v", hero.Camp(), newPos, pos))
 	}

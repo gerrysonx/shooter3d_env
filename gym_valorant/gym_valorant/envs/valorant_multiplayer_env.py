@@ -338,7 +338,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                     hp_remain_reward_coef = 0
                     hp_reward = self.get_hp_remain_reward()
                     self.reward += hp_remain_reward_coef * hp_reward
-                    # self.reward += self.state[0][2]
+                    self.reward += self.state[0][2]
                 else:                    
                     self.reward = 0
                     harm_reward = self.get_harm_reward()

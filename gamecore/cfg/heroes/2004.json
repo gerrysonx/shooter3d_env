@@ -1,11 +1,11 @@
 {
 	"name" : "lusian",
 	"attackFreq" : 0.8,
-	"attackRange" : 2000,
+	"attackRange" : 0,
+	"viewRange" : 2000,
 	"magSize" : 999,
 	"bulletNum" : 999,
 	"reloadTime" : 0.8,
-	"viewRange" : 2000,
     "fov" : 60,
 	"health" : 100,
 	"damage" : 20,

@@ -221,7 +221,7 @@ class MultiPlayer_Data_Generator():
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1
-            if new or step_info.step_idx > 150:
+            if new or step_info.step_idx > 250:
                 if new:#cur_ep_unclipped_ret == 0:
                     pass
                 else:
@@ -712,9 +712,9 @@ class MultiPlayerAgent():
                 c_loss_list.append(c_loss)
                 a_loss_list.append(a_loss)
                 
-                # AddPlotLog(SAVE_DIR + "c_loss.txt", '{}\n'.format(c_loss))
-                # AddPlotLog(SAVE_DIR + "a_loss.txt", '{}\n'.format(a_loss))
-                # AddPlotLog(SAVE_DIR + "a_entropy.txt", '{}\n'.format(entropy))
+                AddPlotLog(SAVE_DIR + "c_loss.txt", '{}\n'.format(c_loss))
+                AddPlotLog(SAVE_DIR + "a_loss.txt", '{}\n'.format(a_loss))
+                AddPlotLog(SAVE_DIR + "a_entropy.txt", '{}\n'.format(entropy))
 
         self.train_writer.add_summary(summary_new_val, timestep)
         self.train_writer.add_summary(summary_old_val, timestep)
@@ -792,7 +792,6 @@ def GetDataGeneratorAndTrainer(scene_id):
 
 def learn(scene_id, num_steps=NUM_STEPS):
     global g_step
-    global SAVE_DIR
     g_step = 0
 
     agent, data_generator, session = GetDataGeneratorAndTrainer(scene_id)
@@ -824,8 +823,8 @@ def learn(scene_id, num_steps=NUM_STEPS):
         summary0.value.add(tag='EpLenMean', simple_value=np.mean(agent.lenbuffer))
         agent.train_writer.add_summary(summary0, timestep)
 
-        # AddPlotLog(SAVE_DIR + "EpLenMean.txt", '{} {}\n'.format(g_step, np.mean(agent.lenbuffer)))
-        # AddPlotLog(SAVE_DIR + "EpRewMean.txt", '{} {}\n'.format(g_step, np.mean(agent.unclipped_rewbuffer)))
+        AddPlotLog(SAVE_DIR + "EpLenMean.txt", '{} {}\n'.format(timestep, np.mean(agent.lenbuffer)))
+        AddPlotLog(SAVE_DIR + "EpRewMean.txt", '{} {}\n'.format(timestep, np.mean(agent.unclipped_rewbuffer)))
 
 
         summary1 = tf.Summary()
@@ -932,10 +931,10 @@ if __name__=='__main__':
 
     args = args.parse_args()
 
-    # DIR = "/home/vision/zjg/" + args.dir_num + "/shooter3d_env/"
+    DIR = "/home/vision/zjg/" + args.dir_num + "/shooter3d_env/"
     np.random.seed(args.seed)
     TIMESTEPS_PER_ACTOR_BATCH = args.horizon
-    # SAVE_DIR = "/home/vision/zjg/" + args.dir_num + "/info/"
+    SAVE_DIR = "/home/vision/zjg/" + args.dir_num + "/info/"
 
     my_env = os.environ
     my_env['moba_env_is_train'] = args.is_train

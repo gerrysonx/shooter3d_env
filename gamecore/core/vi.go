@@ -31,11 +31,9 @@ func (hero *Vi) HandleAICommand(gap_time float64) {
 	if isEnemyNearby {
 		// Check if time to make hurt
 		NormalAttackEnemy(hero, enemy)
-	} else {
-		if !pos_ready {
-			Chase(hero, targetPos, gap_time)
-		}
-
+	}
+	if !pos_ready {
+		Chase(hero, targetPos, gap_time)
 	}
 }
 

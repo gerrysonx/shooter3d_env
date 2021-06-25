@@ -74,6 +74,7 @@ func main() {
 	} else {
 		core.LogHandle = nil
 	}
+	//start log
 	//core.LogHandle = file_handle
 	flag.Parse()
 	core.LogStr(fmt.Sprintf("main is called"))
