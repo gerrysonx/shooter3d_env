@@ -25,7 +25,9 @@ ONE_HOT_SIZE = 10
 # STATE_SIZE will be calculated from scene unit config
 STATE_SIZE = 0
 
-ONE_HERO_FEATURE_SIZE = 5
+#ONE_HERO_FEATURE_SIZE = 5
+SELF_HERO_FEATURE_SIZE = 6
+OPPO_HERO_FEATURE_SIZE = 5
 
 EMBED_SIZE = 5
 LAYER_SIZE = 128
@@ -43,8 +45,8 @@ NUM_FRAME_PER_ACTION = 4
 BATCH_SCALE = 8
 BATCH_SIZE = 64 * BATCH_SCALE
 EPOCH_NUM = 4
-LEARNING_RATE = 4e-4
-TIMESTEPS_PER_ACTOR_BATCH = 16384 #2048 * BATCH_SCALE
+LEARNING_RATE = 2e-4
+TIMESTEPS_PER_ACTOR_BATCH = 8192 #2048 * BATCH_SCALE
 GAMMA = 0.99
 LAMBDA = 0.95
 NUM_STEPS = 5000
@@ -144,10 +146,10 @@ class Environment(object):
 
 
 class MultiPlayer_Data_Generator():
-    def __init__(self, agent, env):
+    def __init__(self, agent, env, timestep):
         self.env = env
         self.agent = agent
-        self.timesteps_per_actor_batch = TIMESTEPS_PER_ACTOR_BATCH
+        self.timesteps_per_actor_batch = timestep
         self.seg_gen = self.traj_segment_generator(horizon=self.timesteps_per_actor_batch)
     
     def traj_segment_generator(self, horizon=256):
@@ -225,7 +227,7 @@ class MultiPlayer_Data_Generator():
                     pass
                 else:
                     # If time expired with no kill, we give it some punishment
-                    expire_punish = -0.8
+                    expire_punish = -2
                     cur_ep_ret += expire_punish
                     cur_ep_unclipped_ret += expire_punish
                     rews[i] = True
@@ -754,7 +756,7 @@ def InitMetaConfig(scene_id):
             
         HERO_COUNT = len(g_dir_skill_mask)
         oppo_hero_count = len(map_dict['OppoHeroes'])
-        STATE_SIZE = (oppo_hero_count + HERO_COUNT) * ONE_HERO_FEATURE_SIZE
+        STATE_SIZE = oppo_hero_count * OPPO_HERO_FEATURE_SIZE + HERO_COUNT * SELF_HERO_FEATURE_SIZE
 
         # Write control file
         ctrl_file_path = '{}/ctrl.txt'.format(root_folder)
@@ -769,7 +771,7 @@ def InitMetaConfig(scene_id):
         pass	    
     pass
 
-def GetDataGeneratorAndTrainer(scene_id):   
+def GetDataGeneratorAndTrainer(scene_id, timestep=TIMESTEPS_PER_ACTOR_BATCH):   
     InitMetaConfig(scene_id)
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -780,7 +782,7 @@ def GetDataGeneratorAndTrainer(scene_id):
     train_writer = tf.summary.FileWriter('{}/../summary_log_gerry'.format(root_folder), graph=tf.get_default_graph()) 
     agent.train_writer = train_writer
 
-    data_generator = MultiPlayer_Data_Generator(agent, env)
+    data_generator = MultiPlayer_Data_Generator(agent, env, timestep)
     return agent, data_generator, session
 
 def learn(scene_id, num_steps=NUM_STEPS):
@@ -909,6 +911,7 @@ if __name__=='__main__':
     my_env = os.environ
     my_env['moba_env_is_train'] = 'True'
     my_env['moba_env_scene_id'] = '{}'.format(scene_id)
+    np.random.seed(0)
 
     if g_is_train:
         learn(scene_id, num_steps=5000)

@@ -7,7 +7,9 @@ import numpy as np
 from gym import error, spaces, utils
 from gym.utils import seeding
 
-ONE_HERO_FEATURE_SIZE = 5
+#ONE_HERO_FEATURE_SIZE = 5
+SELF_HERO_FEATURE_SIZE = 6
+OPPO_HERO_FEATURE_SIZE = 5
 BATTLE_FIELD_SIZE = 1000.0
 MAIN_ACTION_DIMS = 3
 MOVE_DIMS = 8
@@ -70,7 +72,7 @@ def InitMetaConfig(scene_id):
             
         self_hero_count = len(map_dict['SelfHeroes'])
         oppo_hero_count = len(map_dict['OppoHeroes'])
-        obs_size = (oppo_hero_count + self_hero_count) * ONE_HERO_FEATURE_SIZE
+        obs_size = oppo_hero_count * OPPO_HERO_FEATURE_SIZE + self_hero_count * SELF_HERO_FEATURE_SIZE
 
     except Exception as ex:
         pass        
@@ -157,6 +159,8 @@ class ValorantMultiPlayerEnv(gym.Env):
             feature_idx += 1
             state[hero_idx][feature_idx] = (float(json_data['SelfHeroDirY'][hero_idx]) / BATTLE_FIELD_SIZE) - 0.5
             feature_idx += 1
+            state[hero_idx][feature_idx] = (float(json_data['SelfHeroAttkRmnTime'][hero_idx]))
+            feature_idx += 1
             for _id_0 in range(self_hero_count):
                 if _id_0 == hero_idx:
                     continue
@@ -207,10 +211,10 @@ class ValorantMultiPlayerEnv(gym.Env):
                 if self.state[hero_idx][2] <= -0.5:
                     total_harm_reward -= hero_death_penalty
 
-        start_feature_idx = self.self_hero_count * ONE_HERO_FEATURE_SIZE
+        start_feature_idx = self.self_hero_count * SELF_HERO_FEATURE_SIZE
         for hero_idx in range(self.oppo_hero_count):
-            if self.state[0][start_feature_idx + hero_idx * ONE_HERO_FEATURE_SIZE + 2] < self.last_state[0][start_feature_idx + hero_idx * ONE_HERO_FEATURE_SIZE + 2]:
-                delta_hp = self.last_state[0][start_feature_idx + hero_idx * ONE_HERO_FEATURE_SIZE + 2] - self.state[0][start_feature_idx + hero_idx * ONE_HERO_FEATURE_SIZE + 2]
+            if self.state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + 2] < self.last_state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + 2]:
+                delta_hp = self.last_state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + 2] - self.state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + 2]
                 total_harm_reward += harm_reward * delta_hp
 
 
@@ -374,7 +378,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 assert initial_self_hero_count == self.self_hero_count
                 assert initial_oppo_hero_count == self.oppo_hero_count
 
-                state_feature_count = (self.self_hero_count + self.oppo_hero_count) * ONE_HERO_FEATURE_SIZE
+                state_feature_count = self.oppo_hero_count * OPPO_HERO_FEATURE_SIZE + self.self_hero_count * SELF_HERO_FEATURE_SIZE
 
                 self.state = np.zeros((self.self_hero_count, state_feature_count))
                 self.depth = np.zeros((1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE))

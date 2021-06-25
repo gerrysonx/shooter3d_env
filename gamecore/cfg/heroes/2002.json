@@ -1,6 +1,6 @@
 {
 	"name" : "vi",
-	"attackFreq" : 0.8,
+	"attackFreq" : 1,
 	"attackRange" : 1000,
 	"viewRange" : 1000,
     "fov" : 60,

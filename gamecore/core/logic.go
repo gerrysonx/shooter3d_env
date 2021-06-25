@@ -50,15 +50,16 @@ type GameMultiPlayerTrainState struct {
 }
 
 type GameVarPlayerTrainState struct {
-	SelfHeroCount      int32
-	SelfHeroPosX       []float32
-	SelfHeroPosY       []float32
-	SelfHeroPosZ       []float32
-	SelfHeroHealth     []float32
-	SelfHeroHealthFull []float32
-	SelfHeroDepthMap   [][]float32
-	SelfHeroDirX       []float32
-	SelfHeroDirY       []float32
+	SelfHeroCount       int32
+	SelfHeroPosX        []float32
+	SelfHeroPosY        []float32
+	SelfHeroPosZ        []float32
+	SelfHeroHealth      []float32
+	SelfHeroHealthFull  []float32
+	SelfHeroDepthMap    [][]float32
+	SelfHeroDirX        []float32
+	SelfHeroDirY        []float32
+	SelfHeroAttkRmnTime []float32
 
 	OppoHeroCount      int32
 	OppoHeroPosX       []float32
@@ -387,6 +388,7 @@ func (game *Game) ClearGameStateData() {
 	//game.var_player_train_state.SelfHeroPosZ = game.var_player_train_state.SelfHeroPosZ[:0]
 	game.var_player_train_state.SelfHeroDirX = game.var_player_train_state.SelfHeroDirX[:0]
 	game.var_player_train_state.SelfHeroDirY = game.var_player_train_state.SelfHeroDirY[:0]
+	game.var_player_train_state.SelfHeroAttkRmnTime = game.var_player_train_state.SelfHeroAttkRmnTime[:0]
 	game.var_player_train_state.SelfHeroHealth = game.var_player_train_state.SelfHeroHealth[:0]
 	game.var_player_train_state.SelfHeroHealthFull = game.var_player_train_state.SelfHeroHealthFull[:0]
 	game.var_player_train_state.SelfHeroDepthMap = game.var_player_train_state.SelfHeroDepthMap[:0]
@@ -419,6 +421,11 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		viewdir.Normalize()
 		game.var_player_train_state.SelfHeroDirX = append(game.var_player_train_state.SelfHeroDirX, viewdir[0])
 		game.var_player_train_state.SelfHeroDirY = append(game.var_player_train_state.SelfHeroDirY, viewdir[1])
+		attackremaintime := 1 - float32((game.LogicTime-self_hero_unit.LastAttackTime())/self_hero_unit.AttackFreq())
+		if attackremaintime < 0 {
+			attackremaintime = 0
+		}
+		game.var_player_train_state.SelfHeroAttkRmnTime = append(game.var_player_train_state.SelfHeroAttkRmnTime, attackremaintime)
 		game.var_player_train_state.SelfHeroHealth = append(game.var_player_train_state.SelfHeroHealth, self_hero_unit.Health())
 		game.var_player_train_state.SelfHeroHealthFull = append(game.var_player_train_state.SelfHeroHealthFull, self_hero_unit.MaxHealth())
 
