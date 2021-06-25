@@ -1,7 +1,10 @@
 {
 	"name" : "vi",
-	"attackFreq" : 1,
+	"attackFreq" : 0.8,
 	"attackRange" : 1000,
+	"magSize" : 999,
+	"bulletNum" : 999,
+	"reloadTime" : 0.8,
 	"viewRange" : 1000,
     "fov" : 60,
 	"health" : 100,
