@@ -17,26 +17,34 @@ func (hero *Vi) HandleAICommand(gap_time float64) {
 	// Todo: remain z value
 	targetPos[2] = pos[2]
 
-	dist := vec3.Distance(&pos, &targetPos)
+	game := &GameInst
+	//Check if the hero is in Flag area
+	dist2flag := vec3.Distance(&game.FlagPos, &pos)
+	LogStr(fmt.Sprintf("flagpos: %v", game.FlagPos))
+	LogStr(fmt.Sprintf("flagdist: %v", dist2flag))
+	if dist2flag < game.FlagRadius {
+		LogStr(fmt.Sprintf("Securing"))
+		game.isSecuring = true
+	}
+	dist2tar := vec3.Distance(&pos, &targetPos)
 
 	pos_ready := false
-	if dist < 5 {
+	if dist2tar < 5 {
 		// Already the last milestone
 		pos_ready = true
 	}
 
-	LogStr(fmt.Sprintf("self ViewDir: %v", hero.Viewdir()))
+	//LogStr(fmt.Sprintf("self ViewDir: %v", hero.Viewdir()))
 
 	isEnemyNearby, enemy := CheckEnemyInFrustum(hero.Camp(), hero)
 	if isEnemyNearby {
 		// Check if time to make hurt
 		NormalAttackEnemy(hero, enemy)
-	} else {
-		if !pos_ready {
-			Chase(hero, targetPos, gap_time)
-		}
-
 	}
+	if !pos_ready {
+		Chase(hero, targetPos, gap_time)
+	}
+
 }
 
 func (hero *Vi) Tick(gap_time float64) {

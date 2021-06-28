@@ -103,6 +103,13 @@ type Game struct {
 	ShowDepthMap bool
 	ShowFrustum  bool
 	LogoutStack  bool
+
+	FlagPos          vec3.T
+	FlagRadius       float32
+	isSecuring       bool
+	TimeInitSecuring float64
+	Secured          bool
+	Time2Secure      float64
 }
 
 type TestConfig struct {
@@ -211,11 +218,11 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
 				float32(rand_num_1),
 				float32(rand_num_2), float32(80))
-			/*self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
-			float32(-330),
-			float32(250))*/
-			self_hero.SetDirection(vec3.T{float32(-rand_num_1), float32(-rand_num_2), 0})
-			self_hero.SetViewdir(self_hero.Direction())
+			// self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
+			// 	float32(0),
+			// 	float32(0), float32(80))
+			self_hero.SetDirection(vec3.T{0, 0, 0})
+			self_hero.SetViewdir(vec3.T{float32(-rand_num_1), float32(-rand_num_2), 0})
 			LogStr(fmt.Sprintf("Spawn Locations: %v", self_hero.Position()))
 
 			game.BattleUnits = append(game.BattleUnits, self_hero)
@@ -238,7 +245,7 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 				oppo_hero_pos := oppo_hero.Position()
 				oppo_hero.SetDirection(vec3.T{self_hero_pos[0] - oppo_hero_pos[0], self_hero_pos[1] - oppo_hero_pos[1], 0})
 			*/
-			oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1), float32(-10), float32(-10), float32(480))
+			oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1), float32(-10), float32(-10), float32(80))
 			oppo_hero.SetDirection(vec3.T{self_hero_pos[0] + 10, self_hero_pos[1] + 10, 0})
 			oppo_hero.SetViewdir(oppo_hero.Direction())
 			game.BattleUnits = append(game.BattleUnits, oppo_hero)
@@ -331,6 +338,13 @@ func (game *Game) Init() {
 	game.multi_player_train_state.SelfHero0Health = 0
 	game.multi_player_train_state.SelfHero1Health = 0
 	game.multi_player_train_state.OppoHeroHealth = 0
+
+	game.FlagPos = vec3.T{0, 0, 80}
+	game.FlagRadius = 100
+	game.isSecuring = false
+	game.TimeInitSecuring = -1
+	game.Secured = false
+	game.Time2Secure = 1.2
 
 	game.LoadTestCase(fmt.Sprintf("./cfg/maps/%d.json", game.SceneId))
 
@@ -447,12 +461,12 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		oppo_hero_unit := game.OppoHeroes[i].(BaseFunc)
 		game.var_player_train_state.OppoHeroPosX = append(game.var_player_train_state.OppoHeroPosX, oppo_hero_unit.Position()[0])
 		game.var_player_train_state.OppoHeroPosY = append(game.var_player_train_state.OppoHeroPosY, oppo_hero_unit.Position()[1])
-		game.var_player_train_state.OppoHeroPosZ = append(game.var_player_train_state.OppoHeroPosY, oppo_hero_unit.Position()[2])
+		game.var_player_train_state.OppoHeroPosZ = append(game.var_player_train_state.OppoHeroPosZ, oppo_hero_unit.Position()[2])
 		viewdir := oppo_hero_unit.Viewdir()
 		viewdir.Normalize()
 		game.var_player_train_state.OppoHeroDirX = append(game.var_player_train_state.OppoHeroDirX, viewdir[0])
 		game.var_player_train_state.OppoHeroDirY = append(game.var_player_train_state.OppoHeroDirY, viewdir[1])
-		game.var_player_train_state.OppoHeroDirZ = append(game.var_player_train_state.OppoHeroDirY, viewdir[2])
+		game.var_player_train_state.OppoHeroDirZ = append(game.var_player_train_state.OppoHeroDirZ, viewdir[2])
 		game.var_player_train_state.OppoHeroHealth = append(game.var_player_train_state.OppoHeroHealth, oppo_hero_unit.Health())
 		game.var_player_train_state.OppoHeroHealthFull = append(game.var_player_train_state.OppoHeroHealthFull, oppo_hero_unit.MaxHealth())
 		if oppo_hero_unit.Health() > float32(0.0) {
@@ -460,12 +474,12 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		}
 	}
 
-	if all_oppo_heroes_dead || all_self_heroes_dead {
-		if all_oppo_heroes_dead {
-			game.var_player_train_state.SelfWin = 1
-		} else {
-			game.var_player_train_state.SelfWin = -1
-		}
+	if game.Secured {
+		game.var_player_train_state.SelfWin = 1
+	} else if all_oppo_heroes_dead {
+		game.var_player_train_state.SelfWin = 1
+	} else if all_self_heroes_dead {
+		game.var_player_train_state.SelfWin = -1
 	}
 
 	e, err := json.Marshal(game.var_player_train_state)
@@ -513,9 +527,23 @@ func (game *Game) Tick(gap_time float64) {
 		}
 	}
 
+	if game.isSecuring {
+		if game.TimeInitSecuring == -1 {
+			game.TimeInitSecuring = game.LogicTime
+			LogStr(fmt.Sprintf("Init Time: %v", game.TimeInitSecuring))
+		} else if game.TimeInitSecuring+game.Time2Secure < game.LogicTime {
+			game.Secured = true
+			LogStr("Secured!")
+		}
+	} else {
+		game.TimeInitSecuring = -1
+	}
 	temp_arr2 = append(temp_arr2, game.skill_targets_add...)
 	game.skill_targets_add = []SkillTarget{}
 	game.skill_targets = temp_arr2
+	game.isSecuring = false
+	LogStr(fmt.Sprintf("Time++++: %v", game.TimeInitSecuring+game.Time2Secure))
+	LogStr(fmt.Sprintf("Time: %v", game.LogicTime))
 
 }
 
@@ -604,7 +632,6 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 
 	case 1:
 		// rotate left
-		//LogStr(fmt.Sprintf("Input Direction: %v", dir))
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[1]), float64(view_dir[0]))
 		view_dir[0] = float32(math.Cos(theta-0.2) * length)
@@ -628,7 +655,6 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[2]), length)
-		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
 		theta += 0.01
 		if theta > math.Pi/2-1.5 {
 			theta = math.Pi/2 - 1.5
@@ -642,7 +668,6 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 		// Remain the same position
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[2]), length)
-		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
 		theta -= 0.01
 		if theta > math.Pi/2-1.5 {
 			theta = math.Pi/2 - 1.5

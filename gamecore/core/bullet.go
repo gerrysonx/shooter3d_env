@@ -29,7 +29,7 @@ func (bullet *Bullet) Tick(gap_time float64) {
 	if isEnemyNearby && enemy.GetId() != 0 {
 		// Check if time to make hurt
 		enemy.DealDamage(bullet.Damage())
-		LogStr("Bullet: Damage Dealed")
+		//LogStr("Bullet: Damage Dealed")
 		bullet.SetHealth(0)
 
 	} else {

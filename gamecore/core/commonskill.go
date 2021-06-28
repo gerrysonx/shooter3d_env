@@ -599,7 +599,7 @@ func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 
 	// March towards enemy pos
 	dir := hero.Direction()
-	LogStr(fmt.Sprintf("hero dir: %v", dir))
+	//LogStr(fmt.Sprintf("hero dir: %v", dir))
 	dir = dir.Scaled(float32(gap_time))
 	dir = dir.Scaled(float32(hero.Speed()))
 	newPos := vec3.Add(&pos, &dir)

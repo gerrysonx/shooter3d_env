@@ -119,7 +119,7 @@ func (unit *StaticUnit) collidesPlayer(pos vec3.T, height float32) (bool, float3
 	} else if unit.CheckWithin(feet) {
 		for !unit.CheckWithin(step) && step[2] > 0 {
 			step[2] -= 1
-			LogStr(fmt.Sprintf("height: %v", step[2]))
+			//LogStr(fmt.Sprintf("height: %v", step[2]))
 		}
 		return false, step[2] - (pos[2] - height) + 1
 	} else {
@@ -250,7 +250,6 @@ func (battle_field *BattleField) LoadProps(filename string) {
 			var prop StaticUnit
 			prop.Cached = false
 			prop.Name = fmt.Sprintf("prop_%d", _idx)
-			LogStr(v.Name)
 
 			prop.BB.Xmax = -math.MaxFloat32
 			prop.BB.Xmin = math.MaxFloat32
@@ -308,8 +307,6 @@ func (battle_field *BattleField) LoadProps(filename string) {
 					}
 				}
 			}
-
-			LogStr(fmt.Sprintf("AABB data: Xmin: %f, Xmax, %f, Ymin: %f, Ymax, %f, Zmin: %f, Zmax, %f", prop.BB.Xmin, prop.BB.Xmax, prop.BB.Ymin, prop.BB.Ymax, prop.BB.Zmin, prop.BB.Zmax))
 
 			if strings.Contains(v.Name, "ConeBrush") {
 				route = append(route, prop.Pos)

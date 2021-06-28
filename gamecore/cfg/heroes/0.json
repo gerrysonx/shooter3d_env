@@ -7,6 +7,6 @@
 	"damage" : 50,
 	"speed" : 1500,
     "size" : 5,
-    "extent" : [5, 5, 80],
+    "extent" : [5, 5, 5],
     "texture" : "map/bullet.png"
 }

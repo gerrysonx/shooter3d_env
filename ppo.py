@@ -215,7 +215,7 @@ class MultiPlayer_Data_Generator():
             # rew = float(np.sign(unclipped_rew))
             rews[i] = rew
             unclipped_rews[i] = unclipped_rew
-            #if t % 500 == 0: 
+            # if t % 500 == 0: 
             #    print(t)
             
             
@@ -408,11 +408,11 @@ class MultiPlayerAgent():
 
         with tf.variable_scope('optimizer'):
             if g_enable_per:          
-                self.total_loss_arr = -self.a_loss_func_arr + self.c_loss_func_arr - 0.01*self.policy_entropy_arr
+                self.total_loss_arr = -self.a_loss_func_arr + self.c_loss_func_arr - 0.05*self.policy_entropy_arr
                 self.total_loss_arr = tf.multiply(self.total_loss_arr, self.importance_sample_arr_pl)
                 self.total_loss = tf.reduce_mean(self.total_loss_arr)
             else:
-                self.total_loss = self.a_loss_func + self.c_loss_func - 0.01*self.policy_entropy 
+                self.total_loss = self.a_loss_func + self.c_loss_func - 0.05*self.policy_entropy 
             '''
             self.total_loss_arr = self.a_loss_func_arr + self.c_loss_func_arr - 0.01*self.policy_entropy_arr
             self.total_loss = self.a_loss_func + self.c_loss_func - 0.01*self.policy_entropy 

@@ -263,7 +263,7 @@ func (heromgr *HeroMgr) Spawn(a ...interface{}) BaseFunc {
 
 	new_hero.SetLastAttackTime(GameInst.LogicTime)
 	if len(a) > 4 {
-		InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y, a[4].(float32))
+		InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y, pos_z)
 	} else {
 		InitHeroWithCamp(new_hero, wanted_camp, pos_x, pos_y)
 	}
