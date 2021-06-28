@@ -193,7 +193,7 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		full_map_cfg_name := fmt.Sprintf("%s/cfg/maps/%s", root_dir, "a.txt")
 		game.BattleField.LoadProps(full_map_cfg_name)
 
-		born_area_side_width := float64(testconfig.SpawnAreaWidth)
+		// born_area_side_width := float64(testconfig.SpawnAreaWidth)
 
 		/*for _, v := range game.BattleField.Props {
 			pos := vec3.T{237.38586, 257.19244, 10}
@@ -206,15 +206,16 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		oppo_heroes_count := len(testconfig.OppoHeroes)
 
 		for idx := 0; idx < self_heroes_count; idx += 1 {
-			rand_pos := get_rand_pos2(float32(born_area_side_width))
-			rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
+			// rand_pos := get_rand_pos2(float32(born_area_side_width))
+			// rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
-				float32(rand_num_1),
-				float32(rand_num_2), float32(80))
+				float32(600), // float32(rand_num_1),
+				float32(450), // float32(rand_num_2),
+				float32(80))
 			/*self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
 			float32(-330),
 			float32(250))*/
-			self_hero.SetDirection(vec3.T{0, 0, 0})
+			self_hero.SetDirection(vec3.T{-1, 0, 0})
 			self_hero.SetViewdir(self_hero.Direction())
 			LogStr(fmt.Sprintf("Spawn Locations: %v", self_hero.Position()))
 

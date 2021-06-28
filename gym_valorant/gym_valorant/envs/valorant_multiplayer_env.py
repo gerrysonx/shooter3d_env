@@ -230,9 +230,17 @@ class ValorantMultiPlayerEnv(gym.Env):
             if self.state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + HP_INDEX] < self.last_state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + HP_INDEX]:
                 delta_hp = self.last_state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + HP_INDEX] - self.state[0][start_feature_idx + hero_idx * OPPO_HERO_FEATURE_SIZE + HP_INDEX]
                 total_harm_reward += harm_reward * delta_hp
-
-
         return total_harm_reward
+
+    def get_height_reward(self):
+        rise_coef = 0.08
+        down_coef = 0.05
+        height_idx = 2
+        ret = 0
+        for hero_idx in range(self.self_hero_count):
+            delta_height = self.state[hero_idx][height_idx] - self.last_state[hero_idx][height_idx]
+            ret += delta_height * rise_coef if delta_height >= 0 else delta_height * down_coef
+        return ret
 
     def step(self, total_actions):
         #time.sleep(1)
@@ -341,9 +349,8 @@ class ValorantMultiPlayerEnv(gym.Env):
                     self.reward += self.state[0][2]
                 else:                    
                     self.reward = 0
-                    harm_reward = self.get_harm_reward()
-
-                    self.reward += harm_reward
+                    self.reward += self.get_harm_reward()
+                    self.reward += self.get_height_reward()
 
                     self.done = False
                 
