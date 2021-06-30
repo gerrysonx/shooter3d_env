@@ -214,7 +214,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         return total_self_hero_hp
 
     def get_harm_reward(self):
-        harm_reward = 0.01#0.00002
+        harm_reward = 0.01 #0.00002
         hero_death_penalty = 0.2
         total_harm_reward = 0
         for hero_idx in range(self.self_hero_count):
@@ -346,11 +346,11 @@ class ValorantMultiPlayerEnv(gym.Env):
                     hp_remain_reward_coef = 0
                     hp_reward = self.get_hp_remain_reward()
                     self.reward += hp_remain_reward_coef * hp_reward
-                    self.reward += self.state[0][2]
+                    # self.reward += self.state[0][2]
                 else:                    
                     self.reward = 0
                     self.reward += self.get_harm_reward()
-                    self.reward += self.get_height_reward()
+                    # self.reward += self.get_height_reward()
 
                     self.done = False
                 

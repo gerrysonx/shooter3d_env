@@ -568,7 +568,7 @@ func UpdatePos(vertice []float32, pos vec3.T, extent vec3.T) {
 }
 
 func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T, f0 core.BaseFunc) {
-	cone_length, fov, view_frustum := f0.ViewRange(), f0.Fov(), f0.ViewFrustum()
+	cone_length, fov := f0.ViewRange(), f0.Fov()
 	dir.Normalize()
 	unit_width := float32(cone_length / 2) // x
 	unit_height := float32(10)             // z
@@ -584,53 +584,6 @@ func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T, f0 core.BaseFunc) {
 
 	// near far face size ratio
 	SetConeOffset(vertice, 0, 0, 0, unit_width, unit_height, unit_depth, far_face_ratio)
-	// Calculate the rotation quaternion b = dir, b*a^-1
-
-	/*
-		theta := math.Acos(float64(dir[0]))
-		if dir[1] < 0 {
-			theta = math.Pi*2 - theta
-		}
-
-		var quatRotation common.Quaternion
-
-		half_cos_theta := float32(math.Cos(theta / 2.0))
-		half_sin_theta := float32(math.Sin(theta / 2.0))
-		quatRotation.W = half_cos_theta
-		quatRotation.X = 0
-		quatRotation.Y = 0
-		quatRotation.Z = half_sin_theta
-
-		var quatRotationConjugate common.Quaternion
-		quatRotationConjugate.Copy(&quatRotation)
-		quatRotationConjugate.Conjugate()
-
-		var quatRotation2 common.Quaternion
-
-		theta2 := math.Asin(float64(dir[2]))
-		half_cos_theta2 := float32(math.Cos(theta2 / 2.0))
-		half_sin_theta2 := float32(math.Sin(theta2 / 2.0))
-		quatRotation2.W = half_cos_theta2
-		quatRotation2.X = dir[1] * half_sin_theta2
-		quatRotation2.Y = dir[0] * half_sin_theta2
-		quatRotation2.Z = 0
-
-		var quatRotationConjugate2 common.Quaternion
-		quatRotationConjugate2.Copy(&quatRotation2)
-		quatRotationConjugate2.Conjugate()
-
-		PointSize := 5
-		for _idx := 0; _idx < 36; _idx++ {
-			var quatVert common.Quaternion
-			var quatTmp common.Quaternion
-			quatVert.SetVert(vertice[_idx*PointSize : _idx*PointSize+3])
-			quatTmp.Copy(&quatRotation)
-			quatTmp.Multi(&quatVert)
-			quatTmp.Multi(&quatRotationConjugate)
-			//quatTmp.Multi(&quatRotation2)
-			//quatTmp.Multi(&quatRotationConjugate2)
-			quatTmp.GetVert(vertice[_idx*PointSize : _idx*PointSize+3])
-		}*/
 
 	var quatRotation common.Quaternion
 	core.LogStr(fmt.Sprintf("View Dir: %v", dir))
@@ -659,5 +612,5 @@ func UpdatePosDir(vertice []float32, pos vec3.T, dir vec3.T, f0 core.BaseFunc) {
 
 	OffsetObject(vertice, x_new, y_new, z_new, 0, 0, 0)
 
-	GetFarFaceFourPoints(vertice, view_frustum)
+	// GetFarFaceFourPoints(vertice, view_frustum)
 }

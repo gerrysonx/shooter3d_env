@@ -6,6 +6,7 @@ import (
 	"os"
 	"runtime"
 
+	"../common"
 	"github.com/go-gl/mathgl/mgl32"
 
 	"github.com/ungerik/go3d/vec3"
@@ -198,9 +199,65 @@ func rearr_minmax(min float32, max float32) (float32, float32) {
 	}
 }
 
+func CalculateViewFrustum(f0 BaseFunc) {
+	cone_length, fov, view_frustum := f0.ViewRange(), f0.Fov(), f0.ViewFrustum()
+	dir := f0.Viewdir()
+	dir.Normalize()
+	unit_width := float32(cone_length / 2) // x
+	unit_height := float32(10)             // z
+	unit_depth := float32(10)              // y
+
+	tangent := float32(math.Tan(float64(mgl32.DegToRad(fov / 2))))
+	far_face_ratio := cone_length * tangent / unit_height
+
+	pos := f0.Position()
+
+	view_frustum[0][0] = unit_width
+	view_frustum[0][1] = -unit_height * far_face_ratio
+	view_frustum[0][2] = -unit_depth * far_face_ratio
+
+	view_frustum[1][0] = unit_width
+	view_frustum[1][1] = -unit_height * far_face_ratio
+	view_frustum[1][2] = unit_depth * far_face_ratio
+
+	view_frustum[2][0] = unit_width
+	view_frustum[2][1] = unit_height * far_face_ratio
+	view_frustum[2][2] = unit_depth * far_face_ratio
+
+	view_frustum[3][0] = unit_width
+	view_frustum[3][1] = unit_height * far_face_ratio
+	view_frustum[3][2] = -unit_depth * far_face_ratio
+
+	var quatRotation common.Quaternion
+	X := 0.0 //math.Atan2(float64(dir[2]), math.Abs(float64(dir[1])))
+	Y := -math.Atan2(float64(dir[2]), math.Sqrt(float64(dir[0]*dir[0]+dir[1]*dir[1])))
+	Z := math.Atan2(float64(dir[1]), float64(dir[0]))
+	quatRotation.W = float32(math.Cos(Y/2)*math.Cos(Z/2)*math.Cos(X/2) + math.Sin(Y/2)*math.Sin(Z/2)*math.Sin(X/2))
+	quatRotation.X = float32(math.Cos(Y/2)*math.Cos(Z/2)*math.Sin(X/2) - math.Sin(Y/2)*math.Sin(Z/2)*math.Cos(X/2))
+	quatRotation.Y = float32(math.Sin(Y/2)*math.Cos(Z/2)*math.Cos(X/2) + math.Cos(Y/2)*math.Sin(Z/2)*math.Sin(X/2))
+	quatRotation.Z = float32(math.Cos(Y/2)*math.Sin(Z/2)*math.Cos(X/2) - math.Sin(Y/2)*math.Cos(Z/2)*math.Sin(X/2))
+
+	var quatRotationConjugate common.Quaternion
+	quatRotationConjugate.Copy(&quatRotation)
+	quatRotationConjugate.Conjugate()
+	for _idx := 0; _idx < 4; _idx++ {
+		var quatVert common.Quaternion
+		var quatTmp common.Quaternion
+		quatVert.SetVert(view_frustum[_idx][:])
+		quatTmp.Copy(&quatRotation)
+		quatTmp.Multi(&quatVert)
+		quatTmp.Multi(&quatRotationConjugate)
+		quatTmp.GetVert(view_frustum[_idx][:])
+		for j := 0; j < 3; j++ {
+			view_frustum[_idx][j] += pos[j]
+		}
+	}
+
+}
+
 func CalculateViewDepth(f0 BaseFunc) {
 	game := &GameInst
-
+	CalculateViewFrustum(f0)
 	view_depth := f0.ViewDepth()
 	start_point := f0.Position()
 	view_frustum := f0.ViewFrustum()

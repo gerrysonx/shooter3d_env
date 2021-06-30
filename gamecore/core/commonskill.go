@@ -603,6 +603,9 @@ func Chase(hero BaseFunc, pos_enemy vec3.T, gap_time float64) {
 	dir = dir.Scaled(float32(gap_time))
 	dir = dir.Scaled(float32(hero.Speed()))
 	newPos := vec3.Add(&pos, &dir)
+	if !game.BattleField.Within(newPos[0], newPos[1]) {
+		return
+	}
 	tmp := newPos
 	within := false
 	drop := true

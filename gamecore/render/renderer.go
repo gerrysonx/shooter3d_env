@@ -574,6 +574,15 @@ func (renderer *Renderer) Render() {
 		}
 	}
 
+	if core.GameInst.ShowFrustum {
+		for _, v := range renderer.game.BattleUnits {
+			if v.Health() > 0 {
+				actor := renderer.actors[v.GetId()]
+				actor.DrawFrustum(v)
+			}
+		}
+	}
+
 	// Draw the minimap and depth map here
 	gl.Clear(gl.DEPTH_BUFFER_BIT)
 

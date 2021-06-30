@@ -197,6 +197,52 @@ func (actor *Actor) DrawStatic(f0 *core.StaticUnit) {
 	}
 }
 
+func (actor *Actor) DrawFrustum(f0 core.BaseFunc) {
+	dir := f0.Viewdir()
+	dir.Normalize()
+	camp := f0.Camp()
+	// How to bind value?
+	// hp := f0.Health()
+	pos := f0.Position()
+	colorUniform := gl.GetUniformLocation(actor._renderer.program, gl.Str("camp_color\x00"))
+	change_color := float32(0.0)
+	if camp == 0 {
+		gl.Uniform3f(colorUniform, change_color, 0.8, change_color)
+	} else {
+		gl.Uniform3f(colorUniform, 0.8, change_color, change_color)
+	}
+	// Draw view pyramid
+	if f0.GetId() > 0 {
+		if math.Abs(float64(dir[0])) > 1e-3 || math.Abs(float64(dir[1])) > 1e-3 {
+
+			change_color = float32(0.1)
+
+			gl.Uniform3f(colorUniform, change_color, change_color, 0.6)
+
+			transparencyUniform := gl.GetUniformLocation(actor._renderer.program, gl.Str("transparency\x00"))
+			change_color := float32(0.3)
+			gl.Uniform1f(transparencyUniform, change_color)
+
+			UpdatePosDir(actor._vert_buffer, pos, dir, f0)
+
+			gl.BindBuffer(gl.ARRAY_BUFFER, actor._vbo)
+			gl.BufferData(gl.ARRAY_BUFFER, int(actor._vert_buffer_size), gl.Ptr(actor._vert_buffer), gl.DYNAMIC_DRAW)
+
+			gl.BindVertexArray(actor._vao)
+
+			gl.ActiveTexture(gl.TEXTURE0)
+			gl.BindTexture(gl.TEXTURE_2D, actor._tex)
+
+			gl.DrawArrays(gl.TRIANGLES, 0, int32(actor._vert_count))
+			change_color = float32(1.0)
+			gl.Uniform1f(transparencyUniform, change_color)
+		}
+	}
+	for _, sub_actor := range actor._sub_actors {
+		sub_actor.DrawFrustum(f0)
+	}
+}
+
 func (actor *Actor) Draw(f0 core.BaseFunc) {
 	dir := f0.Viewdir()
 	dir.Normalize()
@@ -226,36 +272,6 @@ func (actor *Actor) Draw(f0 core.BaseFunc) {
 	gl.BindTexture(gl.TEXTURE_2D, actor._tex)
 
 	gl.DrawArrays(gl.TRIANGLES, 0, int32(actor._vert_count))
-
-	if core.GameInst.ShowFrustum {
-		// Draw view pyramid
-		if f0.GetId() > 0 {
-			if math.Abs(float64(dir[0])) > 1e-3 || math.Abs(float64(dir[1])) > 1e-3 {
-
-				change_color = float32(0.1)
-
-				gl.Uniform3f(colorUniform, change_color, change_color, 0.6)
-
-				transparencyUniform := gl.GetUniformLocation(actor._renderer.program, gl.Str("transparency\x00"))
-				change_color := float32(0.3)
-				gl.Uniform1f(transparencyUniform, change_color)
-
-				UpdatePosDir(actor._vert_buffer, pos, dir, f0)
-
-				gl.BindBuffer(gl.ARRAY_BUFFER, actor._vbo)
-				gl.BufferData(gl.ARRAY_BUFFER, int(actor._vert_buffer_size), gl.Ptr(actor._vert_buffer), gl.DYNAMIC_DRAW)
-
-				gl.BindVertexArray(actor._vao)
-
-				gl.ActiveTexture(gl.TEXTURE0)
-				gl.BindTexture(gl.TEXTURE_2D, actor._tex)
-
-				gl.DrawArrays(gl.TRIANGLES, 0, int32(actor._vert_count))
-				change_color = float32(1.0)
-				gl.Uniform1f(transparencyUniform, change_color)
-			}
-		}
-	}
 
 	for _, sub_actor := range actor._sub_actors {
 		sub_actor.Draw(f0)

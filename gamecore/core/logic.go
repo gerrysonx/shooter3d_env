@@ -209,13 +209,13 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 			// rand_pos := get_rand_pos2(float32(born_area_side_width))
 			// rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
-				float32(600), // float32(rand_num_1),
+				float32(650), // float32(rand_num_1),
 				float32(450), // float32(rand_num_2),
 				float32(80))
 			/*self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
 			float32(-330),
 			float32(250))*/
-			self_hero.SetDirection(vec3.T{-1, 0, 0})
+			self_hero.SetDirection(vec3.T{0, -1, 0})
 			self_hero.SetViewdir(self_hero.Direction())
 			LogStr(fmt.Sprintf("Spawn Locations: %v", self_hero.Position()))
 
@@ -549,15 +549,18 @@ func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, act
 		offset_y = dir[1]
 		target_pos_x := float32(cur_pos[0] + offset_x)
 		target_pos_y := float32(cur_pos[1] + offset_y)
+		battle_unit.(HeroFunc).SetTargetPos(target_pos_x, target_pos_y)
+		dir.Normalize()
+		battle_unit.SetDirection(dir)
 		// Check self position
 		// game.DefaultHero.SetTargetPos(target_pos_x, target_pos_y)
-		is_target_within := game.BattleField.Within(target_pos_x, target_pos_y)
-		if is_target_within {
-			LogStr(fmt.Sprintf("AI:%v move is called, target pos from (%v, %v) to (%v, %v)", player_idx, cur_pos[0], cur_pos[1], target_pos_x, target_pos_y))
-			battle_unit.(HeroFunc).SetTargetPos(target_pos_x, target_pos_y)
-			dir.Normalize()
-			battle_unit.SetDirection(dir)
-		}
+		// is_target_within := game.BattleField.Within(target_pos_x, target_pos_y)
+		// if is_target_within {
+		// 	LogStr(fmt.Sprintf("AI:%v move is called, target pos from (%v, %v) to (%v, %v)", player_idx, cur_pos[0], cur_pos[1], target_pos_x, target_pos_y))
+		// 	battle_unit.(HeroFunc).SetTargetPos(target_pos_x, target_pos_y)
+		// 	dir.Normalize()
+		// 	battle_unit.SetDirection(dir)
+		// }
 
 	case 2:
 		// normal attack

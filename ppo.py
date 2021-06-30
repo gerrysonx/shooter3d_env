@@ -226,10 +226,10 @@ class MultiPlayer_Data_Generator():
                     pass
                 else:
                     # If time expired with no kill, we give it some punishment
-                    expire_punish = -0.8
+                    expire_punish = 0
                     cur_ep_ret += expire_punish
                     cur_ep_unclipped_ret += expire_punish
-                    rews[i] = True
+                    rews[i] += expire_punish
                 #print(cur_ep_ret)
                 ep_rets.append(cur_ep_ret)
                 ep_unclipped_rets.append(cur_ep_unclipped_ret)
@@ -712,9 +712,9 @@ class MultiPlayerAgent():
                 c_loss_list.append(c_loss)
                 a_loss_list.append(a_loss)
                 
-                AddPlotLog(SAVE_DIR + "c_loss.txt", '{}\n'.format(c_loss))
-                AddPlotLog(SAVE_DIR + "a_loss.txt", '{}\n'.format(a_loss))
-                AddPlotLog(SAVE_DIR + "a_entropy.txt", '{}\n'.format(entropy))
+                # AddPlotLog(SAVE_DIR + "c_loss.txt", '{}\n'.format(c_loss))
+                # AddPlotLog(SAVE_DIR + "a_loss.txt", '{}\n'.format(a_loss))
+                # AddPlotLog(SAVE_DIR + "a_entropy.txt", '{}\n'.format(entropy))
 
         self.train_writer.add_summary(summary_new_val, timestep)
         self.train_writer.add_summary(summary_old_val, timestep)
@@ -823,8 +823,8 @@ def learn(scene_id, num_steps=NUM_STEPS):
         summary0.value.add(tag='EpLenMean', simple_value=np.mean(agent.lenbuffer))
         agent.train_writer.add_summary(summary0, timestep)
 
-        AddPlotLog(SAVE_DIR + "EpLenMean.txt", '{} {}\n'.format(timestep, np.mean(agent.lenbuffer)))
-        AddPlotLog(SAVE_DIR + "EpRewMean.txt", '{} {}\n'.format(timestep, np.mean(agent.unclipped_rewbuffer)))
+        # AddPlotLog(SAVE_DIR + "EpLenMean.txt", '{} {}\n'.format(timestep, np.mean(agent.lenbuffer)))
+        # AddPlotLog(SAVE_DIR + "EpRewMean.txt", '{} {}\n'.format(timestep, np.mean(agent.unclipped_rewbuffer)))
 
 
         summary1 = tf.Summary()
@@ -925,16 +925,16 @@ if __name__=='__main__':
     args = argparse.ArgumentParser()
     args.add_argument("--seed", type=int, default=0, help="the random seed")
     args.add_argument("--dir_num", type=str, default="0")
-    args.add_argument("--horizon", type=int, default=8192)
+    args.add_argument("--horizon", type=int, default=4096)
     args.add_argument("--scene_id", type=int, default=10)
     args.add_argument("--is_train", type=str, default="True")
 
     args = args.parse_args()
 
-    DIR = "/home/vision/zjg/" + args.dir_num + "/shooter3d_env/"
+    DIR = "/media1/zjg/" + args.dir_num + "/shooter3d_env/"
     np.random.seed(args.seed)
     TIMESTEPS_PER_ACTOR_BATCH = args.horizon
-    SAVE_DIR = "/home/vision/zjg/" + args.dir_num + "/info/"
+    SAVE_DIR = "/media1/zjg/" + args.dir_num + "/info/"
 
     my_env = os.environ
     my_env['moba_env_is_train'] = args.is_train

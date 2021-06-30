@@ -123,7 +123,7 @@ type BaseInfo struct {
 	name                string
 	extent              vec3.T
 	view_frustum        [4]vec3.T
-	view_depth          [10000]float32
+	view_depth          [1024]float32
 	bullet_num          uint32
 	mag_size            uint32
 	mag_remain          uint32
