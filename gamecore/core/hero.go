@@ -125,7 +125,6 @@ func (hero *Hero) InitFromJson(full_path string, id int32) bool {
 	}
 	buffer = buffer[:read_count]
 	var jsoninfo JsonInfo
-
 	if err = json.Unmarshal(buffer, &jsoninfo); err == nil {
 		hero.attack_range = jsoninfo.AttackRange
 		hero.attack_freq = jsoninfo.AttackFreq

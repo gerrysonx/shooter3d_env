@@ -19,6 +19,7 @@ VISION_YAW_DIMS = 3
 VISION_PITCH_DIMS = 3
 DEPTH_MAP_SIZE = 30
 HP_INDEX  = 3
+TIME_PENALTY = -0.001
 
 def FindHeroSkills(hero_cfg_file_path, hero_id):
     hero_cfg_file = '{}/{}.json'.format(hero_cfg_file_path, hero_id)
@@ -118,7 +119,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         gamecore_file_path = '{}/../../../gamecore/gamecore'.format(root_folder)
         self.proc = subprocess.Popen([gamecore_file_path, 
                                 '-render=false', '-gym_mode=true', '-debug_log=false', '-slow_tick=false', 
-                                '-multi_player=true', '-scene={}'.format(scene_id), manual_str],
+                                '-multi_player=true', '-scene={}'.format(scene_id), manual_str, '-model_round=10'],
                                 stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, env=my_env)
@@ -214,7 +215,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         return total_self_hero_hp
 
     def get_harm_reward(self):
-        harm_reward = 0.01 #0.00002
+        harm_reward = 0.01#0.00002
         hero_death_penalty = 0.2
         total_harm_reward = 0
         for hero_idx in range(self.self_hero_count):
@@ -312,13 +313,14 @@ class ValorantMultiPlayerEnv(gym.Env):
         # Wait for response.
         # Parse the state
         while True:
+            rate_info=None
             json_str = self.proc.stdout.readline()
             #print('When step, recv game process response {}'.format(json_str))
             if json_str == None or len(json_str) == 0:
                 print('json_str == None or len(json_str) == 0')
                 self.done = True
                 self.reward = 0
-                return [self.state, self.depth], self.reward, self.done, self.info
+                return [self.state, self.depth], self.reward, self.done, self.info, rate_info
 
             try:
                 str_json = json_str.decode("utf-8")
@@ -340,7 +342,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                     elif -1 == jobj['SelfWin']:
                         self.reward = -1
                     else:
-                        self.reward = 1#jobj['SelfWin']
+                        self.reward = 1
 
                     # Add remain hp as reward
                     hp_remain_reward_coef = 0
@@ -350,6 +352,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 else:                    
                     self.reward = 0
                     self.reward += self.get_harm_reward()
+                    self.reward += TIME_PENALTY
                     # self.reward += self.get_height_reward()
 
                     self.done = False
@@ -361,11 +364,11 @@ class ValorantMultiPlayerEnv(gym.Env):
                 self.done = True
                 self.reward = 0
                 self.info.step_idx = self.step_idx
-                return [self.state, self.depth], self.reward, self.done, self.info
+                return [self.state, self.depth], self.reward, self.done, self.info, rate_info
 
         self.info.step_idx = self.step_idx
-        
-        return [self.state, self.depth], self.reward, self.done, self.info
+        rate_info = [jobj["ModelIndex"], jobj["SelfWin"]]
+        return [self.state, self.depth], self.reward, self.done, self.info, rate_info
 
 
     def reset(self):
@@ -375,8 +378,17 @@ class ValorantMultiPlayerEnv(gym.Env):
         # To avoid deadlocks: careful to: add \n to output, flush output, use
         # readline() rather than read()
         #self.proc.stdout.readline()
+
+        
         self.proc.stdin.write(b'36864\n')
-        self.proc.stdin.flush()
+        try:
+            self.proc.stdin.flush()
+        except:
+            for i in range(100):
+                json_str = self.proc.stdout.readline()
+                print(json_str)
+                time.sleep(0.5)
+            return
 
         while True:
             json_str = self.proc.stdout.readline()

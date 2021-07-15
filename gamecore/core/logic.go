@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"./nn"
+
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -72,6 +74,8 @@ type GameVarPlayerTrainState struct {
 	OppoHeroDirY       []float32
 	OppoHeroDirZ       []float32
 
+	ModelIndex []string
+
 	SlowBuffState      float32
 	SlowBuffRemainTime float32
 
@@ -91,6 +95,9 @@ type Game struct {
 	ManualCtrlEnemy bool
 	MultiPlayer     bool
 
+	roundCnt        int
+	RoundAlterModel int
+
 	train_state              GameTrainState
 	multi_player_train_state GameMultiPlayerTrainState
 	var_player_train_state   GameVarPlayerTrainState
@@ -103,6 +110,13 @@ type Game struct {
 	ShowDepthMap bool
 	ShowFrustum  bool
 	LogoutStack  bool
+
+	FlagPos          vec3.T
+	FlagRadius       float32
+	isSecuring       uint8
+	TimeInitSecuring float64
+	Secured          bool
+	Time2Secure      float64
 }
 
 type TestConfig struct {
@@ -139,12 +153,24 @@ func get_rand_pos2(dist float32) []float32 {
 	rand_radiant = rand.Float32() * math.Pi / 12.0
 	switch rand_section_idx {
 	case 0:
+		rand_pos[0] = float32(rand.Int31n(70) + 350)
+		rand_pos[1] = float32(rand.Int31n(300) + 100)
+		return rand_pos[:]
 		rand_radiant += 0.3 * math.Pi
 	case 1:
+		rand_pos[0] = -float32(rand.Int31n(70) + 350)
+		rand_pos[1] = float32(rand.Int31n(300) + 100)
+		return rand_pos[:]
 		rand_radiant += 0.8 * math.Pi
 	case 2:
+		rand_pos[0] = float32(rand.Int31n(70) + 350)
+		rand_pos[1] = -float32(rand.Int31n(300) + 100)
+		return rand_pos[:]
 		rand_radiant += 1.2 * math.Pi
 	case 3:
+		rand_pos[0] = -float32(rand.Int31n(70) + 350)
+		rand_pos[1] = -float32(rand.Int31n(300) + 100)
+		return rand_pos[:]
 		rand_radiant += 1.8 * math.Pi
 	}
 
@@ -193,7 +219,7 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		full_map_cfg_name := fmt.Sprintf("%s/cfg/maps/%s", root_dir, "a.txt")
 		game.BattleField.LoadProps(full_map_cfg_name)
 
-		// born_area_side_width := float64(testconfig.SpawnAreaWidth)
+		born_area_side_width := float64(testconfig.SpawnAreaWidth)
 
 		/*for _, v := range game.BattleField.Props {
 			pos := vec3.T{237.38586, 257.19244, 10}
@@ -205,16 +231,19 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		self_heroes_count := len(testconfig.SelfHeroes)
 		oppo_heroes_count := len(testconfig.OppoHeroes)
 
+		rand_pos := get_rand_pos2(float32(born_area_side_width))
+		rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
+
 		for idx := 0; idx < self_heroes_count; idx += 1 {
 			// rand_pos := get_rand_pos2(float32(born_area_side_width))
 			// rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
 			self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
-				float32(650), // float32(rand_num_1),
-				float32(450), // float32(rand_num_2),
+				float32(rand_num_1),
+				float32(rand_num_2),
 				float32(80))
 			/*self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
-			float32(-330),
-			float32(250))*/
+			float32(650),
+			float32(450))*/
 			self_hero.SetDirection(vec3.T{0, -1, 0})
 			self_hero.SetViewdir(self_hero.Direction())
 			LogStr(fmt.Sprintf("Spawn Locations: %v", self_hero.Position()))
@@ -223,24 +252,15 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 			game.SelfHeroes = append(game.SelfHeroes, self_hero.(HeroFunc))
 		}
 
-		self_hero_pos := game.SelfHeroes[0].(BaseFunc).Position()
 		// Oppo heroes count
 		for idx := 0; idx < oppo_heroes_count; idx += 1 {
-			//	start_pos := (0 - born_area_side_width) / 2
-			/*
-				_seed := rand.Float32() * math.Pi * 2
-				rand_num_1 := math.Cos(float64(_seed)) * born_area_side_width
-				rand_num_2 := math.Sin(float64(_seed)) * born_area_side_width
-
-				oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1),
-					self_hero_pos[0]+float32(rand_num_1),
-					self_hero_pos[1]+float32(rand_num_2))
-
-				oppo_hero_pos := oppo_hero.Position()
-				oppo_hero.SetDirection(vec3.T{self_hero_pos[0] - oppo_hero_pos[0], self_hero_pos[1] - oppo_hero_pos[1], 0})
-			*/
-			oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1), float32(-10), float32(-10), float32(480))
-			oppo_hero.SetDirection(vec3.T{self_hero_pos[0] + 10, self_hero_pos[1] + 10, 0})
+			// rand_pos := get_rand_pos2(float32(born_area_side_width))
+			// rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
+			oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1),
+				float32(-rand_num_1),
+				float32(rand_num_2),
+				float32(80))
+			oppo_hero.SetDirection(vec3.T{0, -1, 0})
 			oppo_hero.SetViewdir(oppo_hero.Direction())
 			game.BattleUnits = append(game.BattleUnits, oppo_hero)
 			game.OppoHeroes = append(game.OppoHeroes, oppo_hero.(HeroFunc))
@@ -333,9 +353,85 @@ func (game *Game) Init() {
 	game.multi_player_train_state.SelfHero1Health = 0
 	game.multi_player_train_state.OppoHeroHealth = 0
 
+	game.FlagPos = vec3.T{0, 0, 80}
+	game.FlagRadius = 50
+	game.isSecuring = 0
+	game.TimeInitSecuring = -1
+	game.Secured = false
+	game.Time2Secure = 1
+
+	if game.roundCnt%game.RoundAlterModel == 0 {
+		for _, v := range HeroMgrInst.heroes {
+			if v.name == "lusian" {
+				index := game.SelectEnemyModel("weighted")
+				//fmt.Printf("Selected Model: %v \n\n\n\n", index)
+				v.model.InitModel(index)
+			}
+		}
+		game.roundCnt = 0
+	}
+	game.roundCnt += 1
+
 	game.LoadTestCase(fmt.Sprintf("./cfg/maps/%d.json", game.SceneId))
 
 	LogStr("Game Inited.")
+}
+
+func (game *Game) SelectEnemyModel(mode string) string {
+	root_dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	file_handle, err := os.Open(fmt.Sprintf("%s/../model/model_list.json", root_dir))
+	if err != nil {
+		panic("Open Model File Error")
+	}
+
+	defer file_handle.Close()
+
+	buffer := make([]byte, 100000)
+	read_count, err := file_handle.Read(buffer)
+	if err != nil {
+		panic("Open Model File Error")
+	}
+	buffer = buffer[:read_count]
+	var jsoninfo nn.ModelJsonInfo
+	var model_index []string
+	var model_score []int
+	if err = json.Unmarshal(buffer, &jsoninfo); err == nil {
+		length := len(jsoninfo.Model)
+		for i := 0; i < length; i += 1 {
+			model_index = append(model_index, jsoninfo.Model[i])
+			model_score = append(model_score, jsoninfo.Score[i])
+		}
+	}
+	// fmt.Printf("List: %v\n", err)
+	// fmt.Printf("List: %v\n", model_index)
+	rand.Seed(time.Now().UTC().UnixNano())
+	switch mode {
+	case "random":
+		idx := rand.Intn(len(model_index))
+		return model_index[idx]
+	case "weighted":
+		var score []float32
+		var total_score float32
+		for i := range model_score {
+			model_score[i] += -1000+rand.Intn(100)
+			total_score += float32(model_score[i])
+		}
+		for i := range model_score {
+			score = append(score, float32(model_score[i]) / total_score)
+		}
+		//fmt.Printf("score: %v", score)
+		prob := rand.Float32()
+		for i, o := range score {
+			prob -= o
+			if prob < 0 {
+				return model_index[i]
+				break
+			}
+		}
+		return "0001"
+	default:
+		return "0001"
+	}
 }
 
 func (game *Game) AddTarget(target SkillTarget) {
@@ -350,37 +446,33 @@ func (game *Game) HandleCallback() {
 
 }
 
-func (game *Game) GetGameState(reverse bool) []float32 {
-	var self_unit BaseFunc
-	var oppo_unit BaseFunc
+func (game *Game) GetGameState(reverse bool) [][]float32 {
 
-	if reverse {
-		oppo_unit = game.SelfHeroes[0].(BaseFunc)
-		self_unit = game.OppoHeroes[0].(BaseFunc)
-	} else {
-		self_unit = game.SelfHeroes[0].(BaseFunc)
-		oppo_unit = game.OppoHeroes[0].(BaseFunc)
+	oppo_count := int(game.var_player_train_state.OppoHeroCount)
+	self_count := int(game.var_player_train_state.SelfHeroCount)
+	width := float32(game.BattleField.Width)
+
+	var game_state [][]float32
+
+	for i := 0; i < oppo_count; i += 1 {
+		game_state = append(game_state, []float32{game.var_player_train_state.OppoHeroPosX[i] / width})
+		game_state = append(game_state, []float32{game.var_player_train_state.OppoHeroPosY[i] / width})
+		game_state = append(game_state, []float32{game.var_player_train_state.OppoHeroPosZ[i]/250 - 1})
+		game_state = append(game_state, []float32{game.var_player_train_state.OppoHeroHealth[i] / game.var_player_train_state.OppoHeroHealthFull[i]})
+		game_state = append(game_state, []float32{game.var_player_train_state.OppoHeroDirX[i]})
+		game_state = append(game_state, []float32{game.var_player_train_state.OppoHeroDirY[i]})
+		game_state = append(game_state, []float32{game.var_player_train_state.OppoHeroDirZ[i]})
 	}
 
-	game_state := make([]float32, 8)
-	game_state[0] = self_unit.Position()[0]/1000.0 - 0.5
-	game_state[1] = self_unit.Position()[1]/1000.0 - 0.5
-	game_state[2] = self_unit.Health()/self_unit.MaxHealth() - 0.5
-
-	game_state[3] = oppo_unit.Position()[0]/1000.0 - 0.5
-	game_state[4] = oppo_unit.Position()[1]/1000.0 - 0.5
-	game_state[5] = oppo_unit.Health()/oppo_unit.MaxHealth() - 0.5
-
-	slow_buff_state := 0.0
-	slow_buff_remain_time_ratio := 0.0
-
-	slow_buff := oppo_unit.GetBuff(BuffSpeedSlow)
-	if slow_buff != nil {
-		slow_buff_state = 1.0
-		slow_buff_remain_time_ratio = (slow_buff.base.Life + slow_buff.addTime - game.LogicTime) / slow_buff.base.Life
+	for i := 0; i < self_count; i += 1 {
+		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroPosX[i] / width})
+		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroPosY[i] / width})
+		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroPosZ[i]/250 - 1})
+		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroHealth[i] / game.var_player_train_state.SelfHeroHealthFull[i]})
+		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroDirX[i]})
+		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroDirY[i]})
+		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroDirZ[i]})
 	}
-	game_state[6] = float32(slow_buff_state)
-	game_state[7] = float32(slow_buff_remain_time_ratio)
 	return game_state
 }
 
@@ -406,6 +498,7 @@ func (game *Game) ClearGameStateData() {
 	game.var_player_train_state.OppoHeroDirZ = game.var_player_train_state.OppoHeroDirZ[:0]
 	game.var_player_train_state.OppoHeroHealth = game.var_player_train_state.OppoHeroHealth[:0]
 	game.var_player_train_state.OppoHeroHealthFull = game.var_player_train_state.OppoHeroHealthFull[:0]
+	game.var_player_train_state.ModelIndex = game.var_player_train_state.ModelIndex[:0]
 }
 
 func (game *Game) DumpVarPlayerGameState() []byte {
@@ -459,14 +552,16 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		if oppo_hero_unit.Health() > float32(0.0) {
 			all_oppo_heroes_dead = false
 		}
+		game.var_player_train_state.ModelIndex = append(game.var_player_train_state.ModelIndex, oppo_hero_unit.GetModelIndex())
 	}
 
-	if all_oppo_heroes_dead || all_self_heroes_dead {
-		if all_oppo_heroes_dead {
-			game.var_player_train_state.SelfWin = 1
-		} else {
-			game.var_player_train_state.SelfWin = -1
-		}
+	// if game.Secured {
+	// 	game.var_player_train_state.SelfWin = 0
+	// } else
+	if all_oppo_heroes_dead {
+		game.var_player_train_state.SelfWin = 1
+	} else if all_self_heroes_dead {
+		game.var_player_train_state.SelfWin = -1
 	}
 
 	e, err := json.Marshal(game.var_player_train_state)
@@ -514,19 +609,38 @@ func (game *Game) Tick(gap_time float64) {
 		}
 	}
 
+	if game.isSecuring != 0 {
+		if game.TimeInitSecuring == -1 {
+			game.TimeInitSecuring = game.LogicTime
+			LogStr(fmt.Sprintf("Init Time: %v", game.TimeInitSecuring))
+		} else if game.TimeInitSecuring+game.Time2Secure < game.LogicTime {
+			game.Secured = true
+			LogStr("Secured!")
+		}
+	} else {
+		game.TimeInitSecuring = -1
+	}
 	temp_arr2 = append(temp_arr2, game.skill_targets_add...)
 	game.skill_targets_add = []SkillTarget{}
 	game.skill_targets = temp_arr2
+	game.isSecuring = 0
+	LogStr(fmt.Sprintf("Time++++: %v", game.TimeInitSecuring+game.Time2Secure))
+	LogStr(fmt.Sprintf("Time: %v", game.LogicTime))
 
 }
 
-func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, action_code_1 int, action_code_2 int) {
+func (game *Game) HandleMultiPlayerAction(player_idx int, camp bool, action_code_0 int, action_code_1 int, action_code_2 int) {
 	if action_code_0 == 9 {
 		game.Init()
 		return
 	}
 
-	battle_unit := game.SelfHeroes[player_idx].(BaseFunc)
+	var battle_unit BaseFunc
+	if camp == true {
+		battle_unit = game.SelfHeroes[player_idx].(BaseFunc)
+	} else {
+		battle_unit = game.OppoHeroes[player_idx].(BaseFunc)
+	}
 	cur_pos := battle_unit.Position()
 	if battle_unit.Health() <= 0 {
 		return
@@ -544,7 +658,11 @@ func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, act
 	case 1:
 		// move
 		dir := ConvertNum2Dir(action_code_1)
-		LogStr(fmt.Sprintf("Input Direction: %v", dir))
+		if camp == true {
+			LogStr(fmt.Sprintf("Input Direction: %v", dir))
+		} else {
+			LogStr(fmt.Sprintf("Enemy AI Direction: %v", dir))
+		}
 		offset_x = dir[0]
 		offset_y = dir[1]
 		target_pos_x := float32(cur_pos[0] + offset_x)
@@ -552,15 +670,6 @@ func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, act
 		battle_unit.(HeroFunc).SetTargetPos(target_pos_x, target_pos_y)
 		dir.Normalize()
 		battle_unit.SetDirection(dir)
-		// Check self position
-		// game.DefaultHero.SetTargetPos(target_pos_x, target_pos_y)
-		// is_target_within := game.BattleField.Within(target_pos_x, target_pos_y)
-		// if is_target_within {
-		// 	LogStr(fmt.Sprintf("AI:%v move is called, target pos from (%v, %v) to (%v, %v)", player_idx, cur_pos[0], cur_pos[1], target_pos_x, target_pos_y))
-		// 	battle_unit.(HeroFunc).SetTargetPos(target_pos_x, target_pos_y)
-		// 	dir.Normalize()
-		// 	battle_unit.SetDirection(dir)
-		// }
 
 	case 2:
 		// normal attack
@@ -595,9 +704,14 @@ func (game *Game) HandleMultiPlayerAction(player_idx int, action_code_0 int, act
 	}
 }
 
-func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, action_code_1 int) {
+func (game *Game) HandleMultiPlayerVision(player_idx int, camp bool, action_code_0 int, action_code_1 int) {
 
-	battle_unit := game.SelfHeroes[player_idx].(BaseFunc)
+	var battle_unit BaseFunc
+	if camp == true {
+		battle_unit = game.SelfHeroes[player_idx].(BaseFunc)
+	} else {
+		battle_unit = game.OppoHeroes[player_idx].(BaseFunc)
+	}
 	view_dir := battle_unit.Viewdir()
 	if battle_unit.Health() <= 0 {
 		return
@@ -632,7 +746,6 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[2]), length)
-		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
 		theta += 0.01
 		if theta > math.Pi/2-1.5 {
 			theta = math.Pi/2 - 1.5
@@ -646,7 +759,6 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 		// Remain the same position
 		length := math.Sqrt(float64(view_dir[0]*view_dir[0] + view_dir[1]*view_dir[1]))
 		theta := math.Atan2(float64(view_dir[2]), length)
-		LogStr(fmt.Sprintf("Length: %v, Theta: %v", length, theta))
 		theta -= 0.01
 		if theta > math.Pi/2-1.5 {
 			theta = math.Pi/2 - 1.5
@@ -660,3 +772,13 @@ func (game *Game) HandleMultiPlayerVision(player_idx int, action_code_0 int, act
 
 // Global game object
 var GameInst Game
+
+func (game *Game) HandleEnemyAICommand() {
+	hero := game.OppoHeroes[0]
+	game_state := game.GetGameState(true)
+	depth_map := hero.(BaseFunc).ViewDepth()
+
+	action_type := hero.(*Lusian).model.SampleAction(game_state, depth_map)
+	game.HandleMultiPlayerAction(0, false, action_type[0], action_type[1], 0) // bug
+	game.HandleMultiPlayerVision(0, false, action_type[2], action_type[3])    // bug
+}

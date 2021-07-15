@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"./nn"
+
 	"github.com/ungerik/go3d/vec3"
 )
 
@@ -129,6 +131,7 @@ type BaseInfo struct {
 	mag_remain          uint32
 	reload_start_time   float64
 	reload_time         float64
+	model               nn.Model
 }
 
 type BaseFunc interface {
@@ -215,6 +218,22 @@ type BaseFunc interface {
 
 	GetReloadStartTime() float64
 	SetReloadStartTime(val float64)
+
+	GetModel() nn.Model
+	SetModel(model nn.Model)
+	GetModelIndex() string
+}
+
+func (baseinfo *BaseInfo) GetModel() nn.Model {
+	return baseinfo.model
+}
+
+func (baseinfo *BaseInfo) SetModel(model nn.Model) {
+	baseinfo.model = model
+}
+
+func (baseinfo *BaseInfo) GetModelIndex() string {
+	return baseinfo.model.GetIndex()
 }
 
 func (baseinfo *BaseInfo) SetMagRemain(val uint32) {
@@ -495,6 +514,7 @@ func (baseinfo *BaseInfo) Copy(src BaseFunc) {
 	baseinfo.SetMagSize(src.GetMagSize())
 	baseinfo.SetBulletNum(src.GetBulletNum())
 	baseinfo.SetReloadTime(src.GetReloadTime())
+	baseinfo.SetModel(src.GetModel())
 }
 
 type JsonInfo struct {

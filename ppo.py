@@ -16,7 +16,7 @@ import random, cv2
 import time
 import math
 import json
-import argparse
+from EloHelper import EloHelper
 
 
 EPSILON = 0.2
@@ -26,7 +26,9 @@ ONE_HOT_SIZE = 10
 # STATE_SIZE will be calculated from scene unit config
 STATE_SIZE = 0
 
-ONE_HERO_FEATURE_SIZE = 7
+#ONE_HERO_FEATURE_SIZE = 5
+SELF_HERO_FEATURE_SIZE = 7
+OPPO_HERO_FEATURE_SIZE = 7
 
 EMBED_SIZE = 5
 LAYER_SIZE = 128
@@ -38,19 +40,20 @@ DEPTH_MAP_SIZE = 0
 # Hero skill mask, to indicate if a hero skill is a directional one.
 # Dynamically load src hero skill types
 g_dir_skill_mask = []
-  
+
 
 NUM_FRAME_PER_ACTION = 4
 BATCH_SCALE = 8
 BATCH_SIZE = 64 * BATCH_SCALE
 EPOCH_NUM = 4
-LEARNING_RATE = 4e-4
-TIMESTEPS_PER_ACTOR_BATCH = 1024 * 16 #2048 * BATCH_SCALE
+LEARNING_RATE = 8e-4
+TIMESTEPS_PER_ACTOR_BATCH = 8192*2  #2048 * BATCH_SCALE
 GAMMA = 0.99
 LAMBDA = 0.95
 NUM_STEPS = 5000
 ENV_NAME = 'gym_valorant:valorant-multiplayer-v0'
 RANDOM_START_STEPS = 4
+STEP_LIMIT=300
 
 g_step = 0
 
@@ -58,7 +61,7 @@ g_step = 0
 g_embed_hero_id = False
 
 # Save model in pb format
-g_save_pb_model = False
+g_save_pb_model = True
 
 # Control if output to tensorboard
 g_out_tb = True
@@ -73,6 +76,7 @@ g_enable_per = False
 g_per_alpha = 0.6
 g_is_beta_start = 0.4
 g_is_beta_end = 1
+g_histo_enabled = True
 
 def scalar_summary(summary_writer, tag_val, values, step):
     summary0 = tf.Summary()
@@ -125,14 +129,14 @@ class Environment(object):
     return self.env.action_space
 
   def step(self, action):
-    _state, self.reward, self.terminal, info = self.env.step(action)
+    _state, self.reward, self.terminal, info, rate_info = self.env.step(action)
     self._screen, self._depth = _state[0], _state[1]
     self.obs[..., :-1] = self.obs[..., 1:]
     self.obs[..., -1] = self._screen
 
     self.depths[..., :-1] = self.depths[..., 1:]
     self.depths[..., -1] = self._depth   
-    return [self.obs, self.depths], self.reward, self.terminal, info
+    return [self.obs, self.depths], self.reward, self.terminal, info, rate_info
 
   def reset(self):
     _state = self.env.reset()
@@ -145,10 +149,10 @@ class Environment(object):
 
 
 class MultiPlayer_Data_Generator():
-    def __init__(self, agent, env):
+    def __init__(self, agent, env, timestep):
         self.env = env
         self.agent = agent
-        self.timesteps_per_actor_batch = TIMESTEPS_PER_ACTOR_BATCH
+        self.timesteps_per_actor_batch = timestep
         self.seg_gen = self.traj_segment_generator(horizon=self.timesteps_per_actor_batch)
     
     def traj_segment_generator(self, horizon=256):
@@ -170,6 +174,8 @@ class MultiPlayer_Data_Generator():
         ep_rets = [] # returns of completed episodes in this segment
         ep_unclipped_rets = [] # unclipped returns of completed episodes in this segment
         ep_lens = [] # lengths of ...
+        model_idx = []
+        wins = []
 
         # Initialize history arrays
         obs = np.array([np.zeros(shape=(HERO_COUNT, STATE_SIZE, C), dtype=np.float32) for _ in range(horizon)])
@@ -192,12 +198,16 @@ class MultiPlayer_Data_Generator():
                 yield {"ob" : obs, "rew" : rews, "vpred" : vpreds, "new" : news,
                         "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
                         "ep_rets" : ep_rets, "ep_lens" : ep_lens,
-                        "ep_unclipped_rets": ep_unclipped_rets, "depth": depths}
+                        "ep_unclipped_rets": ep_unclipped_rets, "depth": depths,
+                        "model_idx": model_idx, "wins": wins}
                 # Be careful!!! if you change the downstream algorithm to aggregate
                 # several of these batches, then be sure to do a deepcopy
                 ep_rets = []
                 ep_unclipped_rets = []
                 ep_lens = []
+                model_idx = []
+                wins = []
+
             i = t % horizon
             obs[i] = ob
             depths[i] = depth
@@ -207,21 +217,20 @@ class MultiPlayer_Data_Generator():
             acs[i] = ac
             prevacs[i] = prevac
 
-            env_state, unclipped_rew, new, step_info = self.env.step(ac)
+            env_state, unclipped_rew, new, step_info, rate_info = self.env.step(ac)
             ob, depth = env_state[0], env_state[1]
 
             rew = unclipped_rew
             # rew = float(np.sign(unclipped_rew))
             rews[i] = rew
             unclipped_rews[i] = unclipped_rew
-            #if t % 500 == 0: 
-            #    print(t)
+            # if t % 500 == 0: 
             
             
             cur_ep_ret += rew
             cur_ep_unclipped_ret += unclipped_rew
             cur_ep_len += 1
-            if new or step_info.step_idx > 250:
+            if new or step_info.step_idx > STEP_LIMIT:
                 if new:#cur_ep_unclipped_ret == 0:
                     pass
                 else:
@@ -231,6 +240,9 @@ class MultiPlayer_Data_Generator():
                     cur_ep_unclipped_ret += expire_punish
                     rews[i] += expire_punish
                 #print(cur_ep_ret)
+                if rate_info:
+                    model_idx.append(rate_info[0])
+                    wins.append(rate_info[1])
                 ep_rets.append(cur_ep_ret)
                 ep_unclipped_rets.append(cur_ep_unclipped_ret)
                 ep_lens.append(cur_ep_len)
@@ -269,7 +281,7 @@ class MultiPlayer_Data_Generator():
         return seg
 
 class MultiPlayerAgent():
-    def __init__(self, session, env):       
+    def __init__(self, session, env):
         self.importance_sample_arr = np.ones([TIMESTEPS_PER_ACTOR_BATCH], dtype=np.float)
         self.session = session
         # Here we get 4 action output heads
@@ -329,11 +341,12 @@ class MultiPlayerAgent():
             self.adv = tf.placeholder(tf.float32, [None, ], name='adv')
             self.importance_sample_arr_pl = tf.placeholder(tf.float32, [None, ], name='importance_sample')
 
-            tf.summary.histogram("input_state", self.multi_s)
-            tf.summary.histogram("input_depth_map", self.multi_d)
-            tf.summary.histogram("input_action", self.multi_a)
-            tf.summary.histogram("input_cumulative_r", self.cumulative_r)
-            tf.summary.histogram("input_adv", self.adv)
+            if g_histo_enabled:
+                tf.summary.histogram("input_state", self.multi_s)
+                tf.summary.histogram("input_depth_map", self.multi_d)
+                tf.summary.histogram("input_action", self.multi_a)
+                tf.summary.histogram("input_cumulative_r", self.cumulative_r)
+                tf.summary.histogram("input_adv", self.adv)
 
 
     def _init_nn(self, *args):
@@ -372,7 +385,8 @@ class MultiPlayerAgent():
                     new_policy_prob = tf.where(a_mask_cond, tf.ones([batch_size, ], dtype=tf.float32), tf.gather_nd(params=self.a_policy_new[hero_idx][idx], indices=a_indices))
                     old_policy_prob = tf.where(a_mask_cond, tf.ones([batch_size, ], dtype=tf.float32), tf.gather_nd(params=self.a_policy_old[hero_idx][idx], indices=a_indices))
 
-                    ratio = tf.multiply(ratio, tf.exp(tf.log(new_policy_prob) - tf.log(old_policy_prob)))
+                    ratio = tf.multiply(ratio, tf.exp(tf.log(tf.clip_by_value(new_policy_prob, 1e-10, 1))\
+                         - tf.log(tf.clip_by_value(old_policy_prob, 1e-10, 1))))
 
             surr = ratio * self.adv                                 # surrogate loss
             a_loss_func_arr = tf.minimum(        # clipped surrogate objective
@@ -407,11 +421,11 @@ class MultiPlayerAgent():
 
         with tf.variable_scope('optimizer'):
             if g_enable_per:          
-                self.total_loss_arr = -self.a_loss_func_arr + self.c_loss_func_arr - 0.01*self.policy_entropy_arr
+                self.total_loss_arr = -self.a_loss_func_arr + self.c_loss_func_arr - 0.05*self.policy_entropy_arr
                 self.total_loss_arr = tf.multiply(self.total_loss_arr, self.importance_sample_arr_pl)
                 self.total_loss = tf.reduce_mean(self.total_loss_arr)
             else:
-                self.total_loss = self.a_loss_func + self.c_loss_func - 0.01*self.policy_entropy 
+                self.total_loss = self.a_loss_func + self.c_loss_func - 0.05*self.policy_entropy 
             '''
             self.total_loss_arr = self.a_loss_func_arr + self.c_loss_func_arr - 0.01*self.policy_entropy_arr
             self.total_loss = self.a_loss_func + self.c_loss_func - 0.01*self.policy_entropy 
@@ -445,7 +459,7 @@ class MultiPlayerAgent():
     def _init_single_actor_net(self, scope, input_pl, input_depth, trainable=True):        
         my_initializer = tf.contrib.layers.xavier_initializer()
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-            if trainable:
+            if trainable and g_histo_enabled:
                 tf.summary.histogram("hidde input:", input_pl)
                 
             flat_output_size = STATE_SIZE*C
@@ -455,18 +469,34 @@ class MultiPlayerAgent():
 
             conv_channel_count = 4
             down_sample_ratio = 4
-            depth_cnn_w_1 = tf.get_variable("depth_cnn_w_1", [8, 8, 1, conv_channel_count], initializer=my_initializer)
+            depth_cnn_w_1 = tf.get_variable("depth_cnn_w_1", [3, 3, 1, conv_channel_count], initializer=my_initializer)
             depth_cnn_b_1 = tf.get_variable("depth_cnn_b_1", [conv_channel_count], initializer=tf.constant_initializer(0.0))
 
-            depth_map_embedding = tf.nn.relu(
+            depth_map_intermediate = tf.nn.relu(
                 tf.nn.bias_add(
                 tf.nn.conv2d(square_depth_input, depth_cnn_w_1, 
                 strides=[1, down_sample_ratio, down_sample_ratio, 1], 
                 padding='SAME'), 
                 depth_cnn_b_1))
+
+
+            
+            conv_channel_count2 = 8
+            down_sample_ratio2 = 2
+            depth_cnn_w_2 = tf.get_variable("depth_cnn_w_2", [3, 3, conv_channel_count, conv_channel_count2], initializer=my_initializer)
+            depth_cnn_b_2 = tf.get_variable("depth_cnn_b_2", [conv_channel_count2], initializer=tf.constant_initializer(0.0))
+
+            depth_map_embedding = tf.nn.relu(
+                tf.nn.bias_add(
+                tf.nn.conv2d(depth_map_intermediate, depth_cnn_w_2, 
+                strides=[1, down_sample_ratio2, down_sample_ratio2, 1], 
+                padding='SAME'), 
+                depth_cnn_b_2))
+
+            
                 
             # Flat conv output
-            conv_flat_dim = int(conv_channel_count * (self.depth_map_size / down_sample_ratio)**2)
+            conv_flat_dim = int(conv_channel_count2 * (self.depth_map_size / down_sample_ratio / down_sample_ratio2)**2)
             flat_conv_output = tf.reshape(depth_map_embedding, [-1, conv_flat_dim], name='flat_conv_output')
 
             # Add hero one-hot vector embedding
@@ -486,8 +516,9 @@ class MultiPlayerAgent():
                 fc_b_1 = tf.get_variable(shape=[self.layer_size], name='fc_b_1',
                     trainable=trainable, initializer=my_initializer)                    
 
-                tf.summary.histogram("fc_W_1", fc_W_1)
-                tf.summary.histogram("fc_b_1", fc_b_1)
+                if g_histo_enabled:
+                    tf.summary.histogram("fc_W_1", fc_W_1)
+                    tf.summary.histogram("fc_b_1", fc_b_1)
 
                 output1 = tf.nn.relu(tf.matmul(input_after_embed, fc_W_1) + fc_b_1)
             else:
@@ -497,8 +528,9 @@ class MultiPlayerAgent():
                 fc_b_1 = tf.get_variable(shape=[self.layer_size], name='fc_b_1',
                     trainable=trainable, initializer=my_initializer)
 
-                tf.summary.histogram("fc_W_1", fc_W_1)
-                tf.summary.histogram("fc_b_1", fc_b_1)
+                if g_histo_enabled:
+                    tf.summary.histogram("fc_W_1", fc_W_1)
+                    tf.summary.histogram("fc_b_1", fc_b_1)
 
                 output1 = tf.nn.relu(tf.matmul(flat_output, fc_W_1) + fc_b_1)                
 
@@ -513,8 +545,9 @@ class MultiPlayerAgent():
             fc_b_2 = tf.get_variable(shape=[self.layer_size], name='fc_b_2',
                 trainable=trainable, initializer=my_initializer)
 
-            tf.summary.histogram("fc_W_2", fc_W_2)
-            tf.summary.histogram("fc_b_2", fc_b_2)
+            if g_histo_enabled:
+                tf.summary.histogram("fc_W_2", fc_W_2)
+                tf.summary.histogram("fc_b_2", fc_b_2)
 
             output2 = tf.nn.relu(tf.matmul(concat_output, fc_W_2) + fc_b_2)
 
@@ -525,11 +558,12 @@ class MultiPlayerAgent():
             fc_b_3 = tf.get_variable(shape=[self.layer_size], name='fc_b_3',
                 trainable=trainable, initializer=my_initializer)
 
-            tf.summary.histogram("fc_W_3", fc_W_3)
-            tf.summary.histogram("fc_b_3", fc_b_3)
+            if g_histo_enabled:
+                tf.summary.histogram("fc_W_3", fc_W_3)
+                tf.summary.histogram("fc_b_3", fc_b_3)
 
             output3 = tf.nn.relu(tf.matmul(output2, fc_W_3) + fc_b_3)
-            if trainable:
+            if trainable and g_histo_enabled:
                 tf.summary.histogram("hidde output:", output3)
 
             a_logits_arr = []
@@ -549,17 +583,19 @@ class MultiPlayerAgent():
                 fc_b_a = tf.get_variable(shape=[output_num], name=bias_layer_name,
                     trainable=trainable, initializer=my_initializer)                    
 
-                tf.summary.histogram(weight_layer_name, fc_W_a)
-                tf.summary.histogram(bias_layer_name, fc_b_a)            
+                if g_histo_enabled:
+                    tf.summary.histogram(weight_layer_name, fc_W_a)
+                    tf.summary.histogram(bias_layer_name, fc_b_a)            
 
                 a_logits = tf.matmul(output3, fc_W_a) + fc_b_a
                 a_logits_arr.append(a_logits)                
-                tf.summary.histogram(logit_layer_name, a_logits)
+                if g_histo_enabled:
+                    tf.summary.histogram(logit_layer_name, a_logits)
 
                 a_prob = stable_softmax(a_logits, head_layer_name) #tf.nn.softmax(a_logits)
                 a_prob_arr.append(a_prob)
-
-                tf.summary.histogram(head_layer_name, a_prob)
+                if g_histo_enabled:
+                    tf.summary.histogram(head_layer_name, a_prob)
 
             # value network
             fc1_W_v = tf.get_variable(shape=[self.layer_size, 1], name='fc1_W_v',
@@ -568,12 +604,14 @@ class MultiPlayerAgent():
             fc1_b_v = tf.get_variable(shape=[1], name='fc1_b_v',
                 trainable=trainable, initializer=my_initializer)
 
-            tf.summary.histogram("fc1_W_v", fc1_W_v)
-            tf.summary.histogram("fc1_b_v", fc1_b_v)
+            if g_histo_enabled:
+                tf.summary.histogram("fc1_W_v", fc1_W_v)
+                tf.summary.histogram("fc1_b_v", fc1_b_v)
 
             value = tf.matmul(output3, fc1_W_v) + fc1_b_v
             value = tf.reshape(value, [-1, ], name = "value_output")
-            tf.summary.histogram("value_head", value)
+            if g_histo_enabled:
+                tf.summary.histogram("value_head", value)
             
             return a_prob_arr, a_logits_arr, value
 
@@ -711,10 +749,6 @@ class MultiPlayerAgent():
                 KL_distance_list.append(kl_distance)
                 c_loss_list.append(c_loss)
                 a_loss_list.append(a_loss)
-                
-                # AddPlotLog(SAVE_DIR + "c_loss.txt", '{}\n'.format(c_loss))
-                # AddPlotLog(SAVE_DIR + "a_loss.txt", '{}\n'.format(a_loss))
-                # AddPlotLog(SAVE_DIR + "a_entropy.txt", '{}\n'.format(entropy))
 
         self.train_writer.add_summary(summary_new_val, timestep)
         self.train_writer.add_summary(summary_old_val, timestep)
@@ -722,8 +756,6 @@ class MultiPlayerAgent():
         scalar_summary(self.train_writer, 'c_loss_raw', c_loss_list, timestep)
         scalar_summary(self.train_writer, 'a_loss_raw', a_loss_list, timestep)
         scalar_summary(self.train_writer, 'a_entropy_raw', Entropy_list, timestep)
-
-        
 
         histo_summary(self.train_writer, 'tdlamret_raw', tdlamret, timestep)
         histo_summary(self.train_writer, 'atarg_raw', atarg, timestep)
@@ -761,7 +793,7 @@ def InitMetaConfig(scene_id):
             
         HERO_COUNT = len(g_dir_skill_mask)
         oppo_hero_count = len(map_dict['OppoHeroes'])
-        STATE_SIZE = (oppo_hero_count + HERO_COUNT) * ONE_HERO_FEATURE_SIZE
+        STATE_SIZE = oppo_hero_count * OPPO_HERO_FEATURE_SIZE + HERO_COUNT * SELF_HERO_FEATURE_SIZE
 
         # Write control file
         ctrl_file_path = '{}/ctrl.txt'.format(root_folder)
@@ -776,7 +808,7 @@ def InitMetaConfig(scene_id):
         pass	    
     pass
 
-def GetDataGeneratorAndTrainer(scene_id):   
+def GetDataGeneratorAndTrainer(scene_id, timestep=TIMESTEPS_PER_ACTOR_BATCH):   
     InitMetaConfig(scene_id)
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
@@ -787,7 +819,7 @@ def GetDataGeneratorAndTrainer(scene_id):
     train_writer = tf.summary.FileWriter('{}/../summary_log_gerry'.format(root_folder), graph=tf.get_default_graph()) 
     agent.train_writer = train_writer
 
-    data_generator = MultiPlayer_Data_Generator(agent, env)
+    data_generator = MultiPlayer_Data_Generator(agent, env, timestep)
     return agent, data_generator, session
 
 def learn(scene_id, num_steps=NUM_STEPS):
@@ -797,35 +829,51 @@ def learn(scene_id, num_steps=NUM_STEPS):
     agent, data_generator, session = GetDataGeneratorAndTrainer(scene_id)
 
 
-    saver = tf.train.Saver(max_to_keep=1)
+    saver = tf.train.Saver(max_to_keep=0)
     if False == g_start_anew:
-        model_file=tf.train.latest_checkpoint('ckpt/')
+        model_file=tf.train.latest_checkpoint('ckpt/model_in_train/')
         if model_file != None:
             saver.restore(session,model_file)
+    # else:
+    #     idx = 1
+    #     tf.saved_model.simple_save(session,
+    #             "./model/model_{}".format(str(idx).zfill(4)),
+    #             inputs={"input_state":agent.multi_s, "input_depth":agent.multi_d},
+    #             outputs={"output_policy_0": agent.a_policy_new[0][0], "output_policy_1": agent.a_policy_new[0][1], "output_policy_2": agent.a_policy_new[0][2], 
+    #             "output_policy_3": agent.a_policy_new[0][3], "output_policy_4": agent.a_policy_new[0][4], 
+    #             "output_value":agent.value[0]}) 
+    #     WriteModelList({"Model":["0001"], "Score":[ELO_SCORE_BASE]})
 
     _save_frequency = 1
     max_rew = -1000000
     for timestep in range(num_steps):
-        seg = data_generator.get_one_step_data()        
+        seg = data_generator.get_one_step_data()
+
+        if ((sum(seg['wins']) / len(seg['wins'])) + 1) / 2 > EloHelper.updateThreshold:
+            score, model_info_t = EloHelper.EloHelper.getEloScore(seg['model_idx'], seg['wins'])
+            if g_save_pb_model:
+                idx = str(int(model_info_t['Model'][-1]) + 1).zfill(4)
+                tf.saved_model.simple_save(session,
+                        "./model/model_{}".format(idx),
+                        inputs={"input_state":agent.multi_s, "input_depth":agent.multi_d},
+                        outputs={"output_policy_0": agent.a_policy_new[0][0], "output_policy_1": agent.a_policy_new[0][1], "output_policy_2": agent.a_policy_new[0][2], 
+                        "output_policy_3": agent.a_policy_new[0][3], "output_policy_4": agent.a_policy_new[0][4], 
+                        "output_value":agent.value[0]}) 
+                saver.save(session,'ckpt/model_{}/mnist.ckpt'.format(idx), global_step=g_step)
+                model_info_t["Model"].append(idx)
+                model_info_t["Score"].append(int(round(score)))
+                EloHelper.EloHelper.writeModelList(model_info_t)
+
 
         entropy, kl_distance = agent.learn_one_traj(timestep, seg)
 
         max_rew = max(max_rew, np.max(agent.unclipped_rewbuffer))
         if (timestep+1) % _save_frequency == 0:
-            saver.save(session,'ckpt/mnist.ckpt', global_step=g_step)
-            if g_save_pb_model:
-                tf.saved_model.simple_save(session,
-                        "./model/model_{}".format(g_step),
-                        inputs={"input_state":agent.s},
-                        outputs={"output_policy_0": agent.a_policy_new[0], "output_policy_1": agent.a_policy_new[1], "output_policy_2": agent.a_policy_new[2], "output_value":agent.value})            
+            saver.save(session,'ckpt/model_in_train/mnist.ckpt', global_step=g_step)
         
         summary0 = tf.Summary()
         summary0.value.add(tag='EpLenMean', simple_value=np.mean(agent.lenbuffer))
         agent.train_writer.add_summary(summary0, timestep)
-
-        # AddPlotLog(SAVE_DIR + "EpLenMean.txt", '{} {}\n'.format(timestep, np.mean(agent.lenbuffer)))
-        # AddPlotLog(SAVE_DIR + "EpRewMean.txt", '{} {}\n'.format(timestep, np.mean(agent.unclipped_rewbuffer)))
-
 
         summary1 = tf.Summary()
         summary1.value.add(tag='UnClippedEpRewMean', simple_value=np.mean(agent.unclipped_rewbuffer))
@@ -845,7 +893,7 @@ def play_game():
     agent = Agent(session, action_space_map, a_space_keys)
 
     saver = tf.train.Saver(max_to_keep=1)
-    model_file=tf.train.latest_checkpoint('ckpt/')
+    model_file=tf.train.latest_checkpoint('ckpt/model_in_train/')
     if model_file != None:
         saver.restore(session, model_file)
 
@@ -914,33 +962,16 @@ def GetSkillTypes(skill_cfg_file_path, hero_skills):
     return skill_dir_type_check
 
 
-def AddPlotLog(file_dir, value):
-    f = open(file_dir, 'a')
-    f.write(value)
-    f.close()
-
 
 if __name__=='__main__':
 
-    args = argparse.ArgumentParser()
-    args.add_argument("--seed", type=int, default=0, help="the random seed")
-    args.add_argument("--dir_num", type=str, default="0")
-    args.add_argument("--horizon", type=int, default=4096)
-    args.add_argument("--scene_id", type=int, default=10)
-    args.add_argument("--is_train", type=str, default="True")
-
-    args = args.parse_args()
-
-    DIR = "/media1/zjg/" + args.dir_num + "/shooter3d_env/"
-    np.random.seed(args.seed)
-    TIMESTEPS_PER_ACTOR_BATCH = args.horizon
-    SAVE_DIR = "/media1/zjg/" + args.dir_num + "/info/"
-
+    scene_id = 10
     my_env = os.environ
-    my_env['moba_env_is_train'] = args.is_train
-    my_env['moba_env_scene_id'] = '{}'.format(args.scene_id)
+    my_env['moba_env_is_train'] = 'True'
+    my_env['moba_env_scene_id'] = '{}'.format(scene_id)
+    np.random.seed(5)
 
     if g_is_train:
-        learn(args.scene_id, num_steps=5000)
+        learn(scene_id, num_steps=5000)
     else:
         play_game()

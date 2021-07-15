@@ -55,11 +55,12 @@ func main() {
 	_run_render := flag.Bool("render", true, "a bool")
 	_input_gap_time := flag.Float64("input_gap", 0.2, "")
 	_manual_enemy := flag.Bool("manual_enemy", false, "a bool")
-	_gym_mode := flag.Bool("gym_mode", true, "a bool")
+	_gym_mode := flag.Bool("gym_mode", false, "a bool")
 	_debug_log := flag.Bool("debug_log", false, "a bool")
 	_slow_tick := flag.Bool("slow_tick", false, "a bool")
 	_multi_player := flag.Bool("multi_player", true, "a bool")
 	_scene_id := flag.Int("scene", 10, "a bool")
+	_round_to_alter_model := flag.Int("model_round", 5, "")
 
 	file_handle, _err := os.Create(fmt.Sprintf("%s/../shooter3d_core.log", root_dir))
 	if _err != nil {
@@ -83,6 +84,7 @@ func main() {
 	core.HeroMgrInst.LoadCfgFolder(fmt.Sprintf("%s/cfg/heroes", root_dir))
 
 	core.GameInst = core.Game{}
+	core.GameInst.RoundAlterModel = *_round_to_alter_model
 
 	core.GameInst.ManualCtrlEnemy = *_manual_enemy
 	core.GameInst.MultiPlayer = *_multi_player
@@ -121,6 +123,7 @@ func main() {
 				// Output game state to stdout
 				if *_multi_player {
 					game_state_str := core.GameInst.DumpVarPlayerGameState()
+					core.GameInst.HandleEnemyAICommand()
 					// core.LogBytes(file_handle, game_state_str)
 					// core.LogStr(fmt.Sprintf("Every step, logic_time:%v, _action_stamp:%d, game_state_str:%s", core.GameInst.LogicTime, _action_stamp, game_state_str))
 					fmt.Printf("%d@%s\n", _action_stamp, game_state_str)
@@ -135,7 +138,7 @@ func main() {
 					if action_code == 36864 {
 						// Init game
 						_action_stamp = 0
-						core.GameInst.HandleMultiPlayerAction(0, 9, 0, 0)
+						core.GameInst.HandleMultiPlayerAction(0, true, 9, 0, 0)
 						_last_input_time = 0
 						// game_state_str := core.GameInst.DumpVarPlayerGameState()
 						// core.LogStr(fmt.Sprintf("After game.init, time:%v, game state is:%s", core.GameInst.LogicTime, game_state_str))
@@ -157,9 +160,8 @@ func main() {
 						// core.LogStr(fmt.Sprintf("_multi_player mode, player id:%d get action code:%v, action_code_0:%v, action_code_1:%v, action_code_2:%v",
 						// 	_idx, action_code, action_code_0, action_code_1, action_code_2))
 						//core.LogStr(fmt.Sprintf("action 3: %v, action 4: %v", action_code_3, action_code_4))
-						core.GameInst.HandleMultiPlayerAction(_idx, action_code_0, action_code_1, action_code_2)
-						core.GameInst.HandleMultiPlayerVision(_idx, action_code_3, action_code_4)
-						//core.GameInst.HandleMultiPlayerVision(_idx, 0, 1)
+						core.GameInst.HandleMultiPlayerAction(_idx, true, action_code_0, action_code_1, action_code_2)
+						core.GameInst.HandleMultiPlayerVision(_idx, true, action_code_3, action_code_4)
 
 						if 9 == action_code_0 {
 							// Instantly output
@@ -183,6 +185,7 @@ func main() {
 				// Output game state to stdout
 				if *_multi_player {
 					game_state_str := core.GameInst.DumpVarPlayerGameState()
+					core.GameInst.HandleEnemyAICommand()
 					// core.LogBytes(file_handle, game_state_str)
 					fmt.Printf("%d@%s\n", _action_stamp, game_state_str)
 				} else {

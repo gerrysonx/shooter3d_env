@@ -4,6 +4,8 @@ Some of code copy from
 https://github.com/openai/baselines/blob/master/baselines/ppo1/pposgd_simple.py
 """
 
+from paramiko import file
+from EloHelper import EloHelper
 import sys
 import copy
 import numpy as np
@@ -20,6 +22,7 @@ import json
 from ppo import GetDataGeneratorAndTrainer
 import boto3
 from boto3.session import Session
+import clear
 
 mybucket = "haytham_traindata__datamingplatform"
 
@@ -27,7 +30,7 @@ access_key = "vkimgpull-datamingplatform-f98d2d53"
 
 secret_key = "vkimgpull-datamingplatform-6ab40a41"
 
-url = "http://shpublicrgw.cephrados.so.db:7480"
+url = "http://shlightspeedrgw.cephrados.so.db:7480"
 
 session = Session(access_key, secret_key)
 
@@ -35,16 +38,43 @@ s3_client = session.client('s3', endpoint_url=url)
 
 s3 = session.resource('s3', endpoint_url=url)
 
-bucket = s3.Bucket('haytham_traindata__datamingplatform')
+bucket = None
 
 g_step = 0
 
 g_log_file_name = None
+g_save_pb_model = True
+g_new_training = True
 
 TIMESTEPS_PER_ACTOR_BATCH = 0
 
-jobid = 0
+def init():
+    global bucket
+    bucket = s3.Bucket(mybucket)
+    try:
+        os.mkdir("./ckpt/model_in_train")
+    except:
+        pass
+    try:
+        os.mkdir('../summary_log_distributed')
+    except:
+        pass
+    try:
+        os.mkdir('../distribute_collected_train_data')
+    except:
+        pass
+    try:
+        os.system('rm -r ../distribute_collected_train_data/*')
+    except:
+        pass
+    try:
+        os.system('rm -r ./model/*')
+    except:
+        pass
+    if g_new_training:
+        clear.clear.clear_model(mybucket)
 
+    
 def log_out(str_log):
     global g_log_file_name
     if g_log_file_name == None:
@@ -61,30 +91,21 @@ def log_out(str_log):
 
 def get_one_step_data(timestep, work_thread_count):
     root_folder = os.path.split(os.path.abspath(__file__))[0]
-    ob, ac, std_atvtg, tdlamret, lens, rets, unclipped_rets, news, depth, hidden_states = [], [], [], [], [], [], [], [], [], []
-    # Enumerate data files under folder
-    files = glob.glob('../distribute_collected_train_data/*')
-    for f in files:
-        os.remove(f)
-    data_folder_path = '{}/../distribute_collected_train_data'.format(root_folder, timestep)
-    collected_all_data_files = False
-    while not collected_all_data_files:
-        objectlist =  bucket.objects.filter(Prefix = 'distribute_collected_train_data')
-        i = 0
-        for obj in objectlist:
-            try:
-                bucket.download_file(obj.key, '../distribute_collected_train_data/{}.data'.format(i))
-                i += 1
-            except:
-                continue
-        for root, _, files in os.walk(data_folder_path):
-            '''
-            if len(files) < work_thread_count:
-                print('Already has {} files, waiting for the worker thread generate more data files.'.format(len(files)))
-                break'''
+    ob, ac, std_atvtg, tdlamret, lens, rets, unclipped_rets, news, depth, hidden_states, model_idx, wins = [], [], [], [], [], [], [], [], [], [], [], []
 
+    data_folder_path = '{}/../distribute_collected_train_data'.format(root_folder)
+    i = 0
+    while i < 25:
+        for root, _, files in os.walk(data_folder_path):
             for file_name in files:
                 full_file_name = '{}/{}'.format(root, file_name)
+                if file_name == 'end.flag':
+                    break
+                else:
+                    while True:
+                        if os.path.exists('{}/end.flag'.format(root)):
+                            break   
+                        time.sleep(0.1)
                 with open(full_file_name, 'rb') as file_handle:
                     _seg = pickle.load(file_handle)
                     ob.extend(_seg["ob"])
@@ -96,12 +117,17 @@ def get_one_step_data(timestep, work_thread_count):
                     unclipped_rets.extend(_seg["ep_unclipped_rets"])
                     news.extend(_seg["new"])
                     depth.extend(_seg["depth"])
+                    model_idx.extend(_seg["model_idx"])
+                    wins.extend(_seg["wins"])
                     if 'hidden_states' in _seg:
                         hidden_states.extend(_seg["hidden_states"])
-            collected_all_data_files = True
-            break
-        time.sleep(10)
-    print('Successfully collected {} files, data size:{} from {}.'.format(len(files), len(ob), timestep))
+                os.remove(full_file_name)
+                os.remove('{}/end.flag'.format(root))
+                
+                i += 1
+        print('{} segments uploaded already, waiting...'.format(i))
+        time.sleep(5)
+    print('Successfully collected {} files, data size:{} from {}.'.format(i, len(ob), timestep))
     seg = {}
     seg["ob"] = np.array(ob)
     seg["ac"] = np.array(ac)
@@ -113,6 +139,8 @@ def get_one_step_data(timestep, work_thread_count):
     seg["ep_unclipped_rets"] = np.array(unclipped_rets)
     seg["hidden_states"] = np.array(hidden_states)
     seg['depth'] =  np.array(depth)
+    seg["model_idx"] = np.array(model_idx)
+    seg["wins"] = np.array(wins)
     return seg
 
 
@@ -121,44 +149,84 @@ def learn(scene_id, num_steps):
     global g_step
     agent, _, session = GetDataGeneratorAndTrainer(scene_id, TIMESTEPS_PER_ACTOR_BATCH)
 
-    saver = tf.train.Saver(max_to_keep=1)
+    saver = tf.train.Saver(max_to_keep=0)
     max_rew = -10000
     base_step = g_step
     #saver = tf.train.import_meta_graph('{}/../ckpt/mnist.ckpt-191.meta'.format(root_folder))
-    for obj in bucket.objects.filter(Prefix = 'ckpt'):
-        bucket.download_file(obj.key, '../'+ obj.key)
-    model_file = '{}/../ckpt/mnist.ckpt-0'.format(root_folder)
+    for obj in bucket.objects.filter(Prefix = 'ckpt/model_in_train'):
+        bucket.download_file(obj.key, './'+ obj.key)
+    model_file = '{}/ckpt/model_in_train/mnist.ckpt-0'.format(root_folder)
     try:
         saver.restore(session, model_file)
-        print('restore file success:{}'.format(model_file))
+        print('restored file successfully:{}'.format(model_file))
     except:
-        print('restore file failed, continue')
-    objectlist =  bucket.objects.filter(Prefix = 'distribute_collected_train_data')
-    for obj in objectlist:
-        s3.Object(mybucket, obj.key).delete()
+        print('restoring file failed, continue')
+    
+    while True:
+        for obj in bucket.objects.filter(Prefix = 'model'):
+            if obj.key == 'model/model_list.json':
+                bucket.download_file(obj.key, './'+ obj.key)
+        if os.path.isfile('./model/model_list.json'):
+            print('model list found, proceed')
+            break
+        else:
+            print('model list not found, retry')
+            time.sleep(5)
+
     for timestep in range(num_steps):
         #g_step = base_step + timestep
         seg = get_one_step_data(timestep, g_data_generator_count)
+
+        if ((sum(seg['wins']) / len(seg['wins'])) + 1) / 2 > EloHelper.updateThreshold:
+            score, model_info_t = EloHelper.getEloScore(seg['model_idx'], seg['wins'])
+            if g_save_pb_model:
+                idx = str(int(model_info_t['Model'][-1]) + 1).zfill(4)
+                tf.saved_model.simple_save(session,
+                        "./model/model_{}".format(idx),
+                        inputs={"input_state":agent.multi_s, "input_depth":agent.multi_d},
+                        outputs={"output_policy_0": agent.a_policy_new[0][0], "output_policy_1": agent.a_policy_new[0][1], "output_policy_2": agent.a_policy_new[0][2], 
+                        "output_policy_3": agent.a_policy_new[0][3], "output_policy_4": agent.a_policy_new[0][4], 
+                        "output_value":agent.value[0]}) 
+                saver.save(session,'ckpt/model_{}/mnist.ckpt'.format(idx), global_step=g_step)
+                for root, _, files in os.walk('{}/ckpt/model_{}'.format(root_folder, idx)):
+                    for file_name in files:
+                        full_file_name = '{}/{}'.format(root, file_name)
+                        response = s3.meta.client.upload_file(full_file_name, mybucket, 'ckpt/model_{}/{}'.format(idx, file_name), ExtraArgs={'ACL':'public-read'})
+                        if response != None:
+                            print(response)
+                for root, _, files in os.walk('{}/model/model_{}'.format(root_folder, idx)):
+                    for file_name in files:
+                        index = root.find('model_{}'.format(idx))
+                        response = s3.meta.client.upload_file('{}/{}'.format(root, file_name), mybucket, 'model/{}/{}'.format(root[index:], file_name), ExtraArgs={'ACL':'public-read'})
+                        if response != None:
+                            print(response)
+                model_info_t["Model"].append(idx)
+                model_info_t["Score"].append(int(round(score)))
+                EloHelper.writeModelList(model_info_t)
+                response = s3.meta.client.upload_file('{}/model_list.json'.format(EloHelper.modelPath), mybucket, 'model/model_list.json', ExtraArgs={'ACL':'public-read'})
+                if response != None:
+                    print(response)
 
         entropy, kl_distance = agent.learn_one_traj(timestep, seg)
 
         max_rew = max(max_rew, np.max(agent.unclipped_rewbuffer))
 
-        saver.save(session, '{}/../ckpt/mnist.ckpt'.format(root_folder), global_step = g_step)
-        for root, _, files in os.walk('{}/../ckpt/'.format(root_folder)):
+        saver.save(session, '{}/ckpt/model_in_train/mnist.ckpt'.format(root_folder), global_step = g_step)
+        for root, _, files in os.walk('{}/ckpt/model_in_train'.format(root_folder)):
             for file_name in files:
                 full_file_name = '{}/{}'.format(root, file_name)
-                print(full_file_name)
-                print(file_name)
-                response = s3.meta.client.upload_file(full_file_name, mybucket, 'ckpt/{}'.format(file_name))
-                print(response)
-        str_log = 'Timestep:{}\tEpLenMean:{}\tEpRewMean:{}\tUnClippedEpRewMean:{}\tMaxUnClippedRew:{}\tEntropy:{}\tKL_distance:{}'.format(timestep,
+                response = s3.meta.client.upload_file(full_file_name, mybucket, 'ckpt/model_in_train/{}'.format(file_name), ExtraArgs={'ACL':'public-read'})
+                if response != None:
+                    print(response)
+        
+        str_log = 'Timestep:{}\tEpLenMean:{}\tEpRewMean:{}\tUnClippedEpRewMean:{}\tMaxUnClippedRew:{}\tEntropy:{}\tKL_distance:{}\tWinning Rate:{}'.format(timestep,
         '%.3f'%np.mean(agent.lenbuffer),
         '%.3f'%np.mean(agent.rewbuffer),
         '%.3f'%np.mean(agent.unclipped_rewbuffer),
         max_rew,
         '%.3f'%entropy,
-        '%.8f'%kl_distance)
+        '%.8f'%kl_distance, 
+        '%.3f'%(((sum(seg['wins']) / len(seg['wins'])) + 1) / 2))
         log_out(str_log)
 
         print(str_log)
@@ -172,8 +240,9 @@ if __name__=='__main__':
     if len(sys.argv) > 1:
         TIMESTEPS_PER_ACTOR_BATCH = int(sys.argv[1])
 
+
     if len(sys.argv) > 2:
-        jobid = int(sys.argv[2])
+        mybucket = sys.argv[2]
 
     if len(sys.argv) > 3:
         g_step = int(sys.argv[3])
@@ -185,4 +254,5 @@ if __name__=='__main__':
     my_env['moba_env_is_train'] = 'True'
     my_env['moba_env_scene_id'] = '{}'.format(scene_id)
 
-    learn(scene_id, num_steps=500)
+    init()
+    learn(scene_id, num_steps=50000)
