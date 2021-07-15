@@ -337,11 +337,11 @@ class ValorantMultiPlayerEnv(gym.Env):
 
                 if jobj['SelfWin'] != 0:
                     self.done = True
-                    if 2 == jobj['SelfWin']:
+                    if jobj['SelfWin'] == 2:
                         self.reward = 0
-                    elif -1 == jobj['SelfWin']:
+                    elif jobj['SelfWin'] == -1:
                         self.reward = -1
-                    else:
+                    elif jobj['SelfWin'] == 1:
                         self.reward = 1
 
                     # Add remain hp as reward

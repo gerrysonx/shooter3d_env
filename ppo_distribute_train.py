@@ -63,15 +63,15 @@ def init():
         os.mkdir('../distribute_collected_train_data')
     except:
         pass
-    try:
-        os.system('rm -r ../distribute_collected_train_data/*')
-    except:
-        pass
-    try:
-        os.system('rm -r ./model/*')
-    except:
-        pass
     if g_new_training:
+        try:
+            os.system('rm -r ../distribute_collected_train_data/*')
+        except:
+            pass
+        try:
+            os.system('rm -r ./model/*')
+        except:
+            pass
         clear.clear.clear_model(mybucket)
 
     

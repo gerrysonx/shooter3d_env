@@ -413,11 +413,11 @@ func (game *Game) SelectEnemyModel(mode string) string {
 		var score []float32
 		var total_score float32
 		for i := range model_score {
-			model_score[i] += -1000+rand.Intn(100)
+			model_score[i] += -1000 + rand.Intn(100)
 			total_score += float32(model_score[i])
 		}
 		for i := range model_score {
-			score = append(score, float32(model_score[i]) / total_score)
+			score = append(score, float32(model_score[i])/total_score)
 		}
 		//fmt.Printf("score: %v", score)
 		prob := rand.Float32()
@@ -558,10 +558,14 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 	// if game.Secured {
 	// 	game.var_player_train_state.SelfWin = 0
 	// } else
-	if all_oppo_heroes_dead {
+	if !all_self_heroes_dead && all_oppo_heroes_dead {
 		game.var_player_train_state.SelfWin = 1
-	} else if all_self_heroes_dead {
+	} else if all_self_heroes_dead && !all_oppo_heroes_dead {
 		game.var_player_train_state.SelfWin = -1
+	} else if all_self_heroes_dead && all_oppo_heroes_dead {
+		game.var_player_train_state.SelfWin = 2
+	} else {
+		game.var_player_train_state.SelfWin = 0
 	}
 
 	e, err := json.Marshal(game.var_player_train_state)

@@ -5,7 +5,7 @@ import json
 
 class EloHelper:
     eloScoreBase = 1000
-    eloIncrementStep = 16
+    eloIncrementStep = 512
     modelPath = "./model"
     updateThreshold = 0.6
 
@@ -41,5 +41,7 @@ class EloHelper:
             score_increment = 0
             for _model_idx in model_idx[_idx]:
                 score_increment += EloHelper.getScoreIncrement(score, model_score[_model_idx],  (wins[_idx] + 1) / 2)
+                score_increment /= len(wins)
             score += score_increment / len(model_idx[_idx])
+            
         return score, model_info_t
