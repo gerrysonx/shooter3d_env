@@ -497,7 +497,7 @@ func (game *Game) GetGameState(reverse bool) [][]float32 {
 		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroDirZ[i]})
 	}
 
-	game_state = append(game_state, []float32{1 - float32(game.var_player_train_state.Securing)})
+	game_state = append(game_state, []float32{float32(game.var_player_train_state.Securing)})
 
 	return game_state
 }

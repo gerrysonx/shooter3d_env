@@ -13,7 +13,7 @@
 	"OppoTowers" : [],
 	"SelfCreeps" : [],
 	"OppoCreeps" : [], 
-	"FlagPos_x"	 : [0], 
-	"FlagPos_y"	 : [0], 
-	"FlagPos_z"	 : [80]
+	"FlagPos_x"	 : [200, -200], 
+	"FlagPos_y"	 : [-200, -200], 
+	"FlagPos_z"	 : [80, 80]
 }
