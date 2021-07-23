@@ -567,7 +567,9 @@ func NormalAttackEnemy(hero BaseFunc, enemy BaseFunc) {
 	if hero.GetMagRemain() > 0 {
 		if (hero.LastAttackTime() + hero.AttackFreq()) < float64(now_seconds) {
 			// Make damage
+			temp_randnum := vec3.T{float32(rand.Int31n(60)-30), float32(rand.Int31n(60)-30), float32(rand.Int31n(40)-20)}
 			dir_a := enemy.Position()
+			dir_a = vec3.Add(&dir_a, &temp_randnum)
 			dir_b := hero.Position()
 			dir := vec3.Sub(&dir_a, &dir_b)
 			bullet := HeroMgrInst.Spawn(int32(UnitTypeBullet), hero.Camp(), hero.Position()[0], hero.Position()[1], hero.Position()[2])

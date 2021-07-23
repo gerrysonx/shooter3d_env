@@ -13,6 +13,7 @@ type NeuralNet struct {
 	saved_model      *tf.SavedModel
 	input_s_op         tf.Output
 	input_d_op			tf.Output
+	input_c_op			tf.Output
 	output_policy_0_op tf.Output
 	output_policy_1_op tf.Output
 	output_policy_3_op tf.Output
@@ -55,6 +56,7 @@ func (nn *NeuralNet) Load(pb_path string) {
 
 	nn.input_s_op = nn.saved_model.Graph.Operation("input/multi_s").Output(0)
 	nn.input_d_op = nn.saved_model.Graph.Operation("input/multi_d").Output(0)
+	nn.input_c_op = nn.saved_model.Graph.Operation("input/multi_c").Output(0)
 	nn.output_policy_0_op = nn.saved_model.Graph.Operation("policy_net_new/policy_net_new/policy_head_0_head").Output(0)
 	nn.output_policy_1_op = nn.saved_model.Graph.Operation("policy_net_new/policy_net_new/policy_head_1_head").Output(0)
 	nn.output_policy_3_op = nn.saved_model.Graph.Operation("policy_net_new/policy_net_new/policy_head_3_head").Output(0)
@@ -66,7 +68,7 @@ func (nn *NeuralNet) Release() {
 	nn.saved_model.Session.Close()
 }
 
-func (nn *NeuralNet) Ref(input_data_s [][][][]float32, input_data_d [][][][]float32) []*tf.Tensor {
+func (nn *NeuralNet) Ref(input_data_s [][][][]float32, input_data_d [][][][]float32, input_data_c [][][][]int32) []*tf.Tensor {
 	input_tensor_s, err := tf.NewTensor(input_data_s)
 	if err != nil {
 		panic(err)
@@ -77,12 +79,18 @@ func (nn *NeuralNet) Ref(input_data_s [][][][]float32, input_data_d [][][][]floa
 		panic(err)
 	}
 
+	input_tensor_c, err := tf.NewTensor(input_data_c)
+	if err != nil {
+		panic(err)
+	}
+
 	//fmt.Printf("shape: %v, %v", input_tensor_s.Shape(), input_tensor_d.Shape())
 
 	result, run_err := nn.saved_model.Session.Run(
 		map[tf.Output]*tf.Tensor{
 			nn.input_s_op: input_tensor_s,
 			nn.input_d_op: input_tensor_d,
+			nn.input_c_op: input_tensor_c,
 		},
 		[]tf.Output{nn.output_policy_0_op, nn.output_policy_1_op, nn.output_policy_3_op, nn.output_policy_4_op},
 		nil)

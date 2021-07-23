@@ -527,11 +527,13 @@ func ConvertNum2Dir(action_code int) (dir vec3.T) {
 }
 
 func CheckWithinFlagArea(game *Game, pos *vec3.T) bool {
-	dist2flag := vec3.Distance(&game.FlagPos, pos)
-	LogStr(fmt.Sprintf("flagpos: %v", game.FlagPos))
-	LogStr(fmt.Sprintf("flagdist: %v", dist2flag))
-	if dist2flag < game.FlagRadius {
-		return true
+	for _, v := range game.FlagPos{
+		dist2flag := vec3.Distance(&v, pos)
+		LogStr(fmt.Sprintf("flagpos: %v", game.FlagPos))
+		LogStr(fmt.Sprintf("flagdist: %v", dist2flag))
+		if dist2flag < game.FlagRadius {
+			return true
+		}
 	}
 	return false
 }

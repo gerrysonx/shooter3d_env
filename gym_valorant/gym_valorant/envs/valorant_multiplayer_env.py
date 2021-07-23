@@ -10,7 +10,7 @@ from gym.utils import seeding
 
 #ONE_HERO_FEATURE_SIZE = 5
 SELF_HERO_FEATURE_SIZE = 7
-OPPO_HERO_FEATURE_SIZE = 7
+OPPO_HERO_FEATURE_SIZE = 7 + 1 # 1 for whether the flag is being secured
 BATTLE_FIELD_SIZE = 1000.0
 MAIN_ACTION_DIMS = 3
 MOVE_DIMS = 8
@@ -96,6 +96,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         
         self.state = None
         self.depth = None
+        self.camp = None
         self.reward = 0
         self.info = ValorantEnvInfo()
         self.last_state = None
@@ -143,7 +144,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         print('moba_env initialized.')
         pass
 
-    def fill_state(self, state, depth, json_data):
+    def fill_state(self, state, depth, camp, json_data):
         # View from the point view of each self
         self_hero_count = int(json_data['SelfHeroCount'])
 
@@ -203,7 +204,11 @@ class ValorantMultiPlayerEnv(gym.Env):
                 state[hero_idx][feature_idx] = float(json_data['OppoHeroDirZ'][hero_idx])
                 feature_idx += 1
             pass
+            state[hero_idx][feature_idx] = float(json_data['Securing'])
 
+        camp[0][0] = float(json_data['CampCTF'])
+
+            
         pass
 
     def get_hp_remain_reward(self):
@@ -320,7 +325,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 print('json_str == None or len(json_str) == 0')
                 self.done = True
                 self.reward = 0
-                return [self.state, self.depth], self.reward, self.done, self.info, rate_info
+                return [self.state, self.depth, self.camp], self.reward, self.done, self.info, rate_info
 
             try:
                 str_json = json_str.decode("utf-8")
@@ -333,7 +338,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 jobj = json.loads(parts[1])
                 #print("Spawn X: ", jobj["SelfHeroPosX"], " Y: ", jobj["SelfHeroPosY"])
                 self.last_state[...] = self.state[...]
-                self.fill_state(self.state, self.depth, jobj)
+                self.fill_state(self.state, self.depth, self.camp, jobj)
 
                 if jobj['SelfWin'] != 0:
                     self.done = True
@@ -364,16 +369,16 @@ class ValorantMultiPlayerEnv(gym.Env):
                 self.done = True
                 self.reward = 0
                 self.info.step_idx = self.step_idx
-                return [self.state, self.depth], self.reward, self.done, self.info, rate_info
+                return [self.state, self.depth, self.camp], self.reward, self.done, self.info, rate_info
 
         self.info.step_idx = self.step_idx
         rate_info = [jobj["ModelIndex"], jobj["SelfWin"]]
-        return [self.state, self.depth], self.reward, self.done, self.info, rate_info
+        return [self.state, self.depth, self.camp], self.reward, self.done, self.info, rate_info
 
 
     def reset(self):
         if 0 == self.step_idx:
-            return [self.state, self.depth]
+            return [self.state, self.depth, self.camp]
         self.restart_proc()
         # To avoid deadlocks: careful to: add \n to output, flush output, use
         # readline() rather than read()
@@ -416,8 +421,9 @@ class ValorantMultiPlayerEnv(gym.Env):
 
                 self.state = np.zeros((self.self_hero_count, state_feature_count))
                 self.depth = np.zeros((1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE))
+                self.camp = np.zeros((1, 1))
                 
-                self.fill_state(self.state, self.depth, jobj)                
+                self.fill_state(self.state, self.depth, self.camp, jobj)                
                 self.last_state = copy.deepcopy(self.state)
                 break
 
@@ -425,7 +431,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 print('When resetting env, parsing json failed.')
                 continue
     
-        return [self.state, self.depth]
+        return [self.state, self.depth, self.camp]
 
 
     def render(self, mode='human'):

@@ -33,6 +33,12 @@ func (hero *Lusian) HandleAICommand(gap_time float64) {
 	// Todo: remain z value
 	targetPos[2] = pos[2]
 
+	if GameInst.var_player_train_state.CampCTF == 1 {
+		if CheckWithinFlagArea(&GameInst, &pos) {
+			GameInst.isSecuring += 2
+		}
+	}
+
 	//Check if the hero is in Flag area
 
 	dist2tar := vec3.Distance(&pos, &targetPos)

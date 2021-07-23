@@ -54,7 +54,7 @@ func (hero *Model) InitModel(index string) {
 	hero.r = rand.New(rand.NewSource(0))
 }
 
-func (model *Model) SampleAction(game_state [][]float32, depth_map []float32) []int {
+func (model *Model) SampleAction(game_state [][]float32, depth_map []float32, camp_info int32) []int {
 
 	// Inference from nn
 	var temp_depth_map [][]float32
@@ -63,8 +63,8 @@ func (model *Model) SampleAction(game_state [][]float32, depth_map []float32) []
 	}
 	formatted_game_state := [][][][]float32{[][][]float32{game_state}}
 	formatted_depth_map := [][][][]float32{[][][]float32{temp_depth_map}}
-
-	predict := model.model.Ref(formatted_game_state, formatted_depth_map)
+	formatted_camp_info := [][][][]int32{[][][]int32{[][]int32{[]int32{camp_info}}}}
+	predict := model.model.Ref(formatted_game_state, formatted_depth_map, formatted_camp_info)
 
 	var action []int
 	for _, p := range predict {

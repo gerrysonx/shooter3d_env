@@ -80,6 +80,10 @@ type GameVarPlayerTrainState struct {
 	SlowBuffRemainTime float32
 
 	SelfWin int32
+
+	CampCTF int32
+
+	Securing int32
 }
 
 type Game struct {
@@ -111,7 +115,7 @@ type Game struct {
 	ShowFrustum  bool
 	LogoutStack  bool
 
-	FlagPos          vec3.T
+	FlagPos          []vec3.T
 	FlagRadius       float32
 	isSecuring       uint8
 	TimeInitSecuring float64
@@ -134,6 +138,9 @@ type TestConfig struct {
 	Width          float32
 	Height         float32
 	DepthMapSize   int
+	FlagPos_x      []float32
+	FlagPos_y      []float32
+	FlagPos_z      []float32
 }
 
 func get_rand_pos(dist float32) []float32 {
@@ -154,22 +161,22 @@ func get_rand_pos2(dist float32) []float32 {
 	switch rand_section_idx {
 	case 0:
 		rand_pos[0] = float32(rand.Int31n(70) + 350)
-		rand_pos[1] = float32(rand.Int31n(300) + 100)
+		rand_pos[1] = float32(rand.Int31n(200) + 100)
 		return rand_pos[:]
 		rand_radiant += 0.3 * math.Pi
 	case 1:
 		rand_pos[0] = -float32(rand.Int31n(70) + 350)
-		rand_pos[1] = float32(rand.Int31n(300) + 100)
+		rand_pos[1] = float32(rand.Int31n(200) + 100)
 		return rand_pos[:]
 		rand_radiant += 0.8 * math.Pi
 	case 2:
 		rand_pos[0] = float32(rand.Int31n(70) + 350)
-		rand_pos[1] = -float32(rand.Int31n(300) + 100)
+		rand_pos[1] = -float32(rand.Int31n(200) + 100)
 		return rand_pos[:]
 		rand_radiant += 1.2 * math.Pi
 	case 3:
 		rand_pos[0] = -float32(rand.Int31n(70) + 350)
-		rand_pos[1] = -float32(rand.Int31n(300) + 100)
+		rand_pos[1] = -float32(rand.Int31n(200) + 100)
 		return rand_pos[:]
 		rand_radiant += 1.8 * math.Pi
 	}
@@ -219,19 +226,27 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 		full_map_cfg_name := fmt.Sprintf("%s/cfg/maps/%s", root_dir, "a.txt")
 		game.BattleField.LoadProps(full_map_cfg_name)
 
-		born_area_side_width := float64(testconfig.SpawnAreaWidth)
+		//born_area_side_width := float64(testconfig.SpawnAreaWidth)
 
-		/*for _, v := range game.BattleField.Props {
-			pos := vec3.T{237.38586, 257.19244, 10}
-			within := v.CheckWithin(pos)
-			LogStr(fmt.Sprintf("In Wall: %v", within))
-		}*/
+		for i := range testconfig.FlagPos_x {
+			pos := vec3.T{testconfig.FlagPos_x[i], testconfig.FlagPos_y[i], testconfig.FlagPos_z[i]}
+			game.FlagPos = append(game.FlagPos, pos)
+		}
+		//fmt.Printf("\n\n\n\n FlagPos: \n%v", game.FlagPos)
 
 		// Self heroes count
 		self_heroes_count := len(testconfig.SelfHeroes)
 		oppo_heroes_count := len(testconfig.OppoHeroes)
 
-		rand_pos := get_rand_pos2(float32(born_area_side_width))
+		//rand_pos := get_rand_pos2(float32(born_area_side_width))
+		var rand_pos [2]float32
+		if game.var_player_train_state.CampCTF == 0 {
+			rand_pos[0] = float32(0)
+			rand_pos[1] = float32(-350)
+		} else {
+			rand_pos[0] = float32(0)
+			rand_pos[1] = float32(350)
+		}
 		rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
 
 		for idx := 0; idx < self_heroes_count; idx += 1 {
@@ -241,10 +256,9 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 				float32(rand_num_1),
 				float32(rand_num_2),
 				float32(80))
-			/*self_hero := HeroMgrInst.Spawn(testconfig.SelfHeroes[idx], int32(0),
-			float32(650),
-			float32(450))*/
-			self_hero.SetDirection(vec3.T{0, -1, 0})
+			temp_dir := vec3.T{rand_num_1, rand_num_2, 0}
+			temp_dir.Normalize()
+			self_hero.SetDirection(temp_dir)
 			self_hero.SetViewdir(self_hero.Direction())
 			LogStr(fmt.Sprintf("Spawn Locations: %v", self_hero.Position()))
 
@@ -257,10 +271,12 @@ func (game *Game) LoadTestCase(test_cfg_name string) {
 			// rand_pos := get_rand_pos2(float32(born_area_side_width))
 			// rand_num_1, rand_num_2 := rand_pos[0], rand_pos[1]
 			oppo_hero := HeroMgrInst.Spawn(testconfig.OppoHeroes[idx], int32(1),
-				float32(-rand_num_1),
-				float32(rand_num_2),
+				float32(rand_num_1),
+				float32(-rand_num_2),
 				float32(80))
-			oppo_hero.SetDirection(vec3.T{0, -1, 0})
+			temp_dir := vec3.T{rand_num_1, -rand_num_2, 0}
+			temp_dir.Normalize()
+			oppo_hero.SetDirection(temp_dir)
 			oppo_hero.SetViewdir(oppo_hero.Direction())
 			game.BattleUnits = append(game.BattleUnits, oppo_hero)
 			game.OppoHeroes = append(game.OppoHeroes, oppo_hero.(HeroFunc))
@@ -353,12 +369,12 @@ func (game *Game) Init() {
 	game.multi_player_train_state.SelfHero1Health = 0
 	game.multi_player_train_state.OppoHeroHealth = 0
 
-	game.FlagPos = vec3.T{0, 0, 80}
+	game.FlagPos = []vec3.T{}
 	game.FlagRadius = 50
 	game.isSecuring = 0
 	game.TimeInitSecuring = -1
 	game.Secured = false
-	game.Time2Secure = 1
+	game.Time2Secure = 5
 
 	if game.roundCnt%game.RoundAlterModel == 0 {
 		for _, v := range HeroMgrInst.heroes {
@@ -371,6 +387,13 @@ func (game *Game) Init() {
 		game.roundCnt = 0
 	}
 	game.roundCnt += 1
+
+	rand.Seed(time.Now().UTC().UnixNano())
+	if rand.Float32() > 0.5 {
+		game.var_player_train_state.CampCTF = 0
+	} else {
+		game.var_player_train_state.CampCTF = 1
+	}
 
 	game.LoadTestCase(fmt.Sprintf("./cfg/maps/%d.json", game.SceneId))
 
@@ -473,6 +496,9 @@ func (game *Game) GetGameState(reverse bool) [][]float32 {
 		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroDirY[i]})
 		game_state = append(game_state, []float32{game.var_player_train_state.SelfHeroDirZ[i]})
 	}
+
+	game_state = append(game_state, []float32{1 - float32(game.var_player_train_state.Securing)})
+
 	return game_state
 }
 
@@ -555,17 +581,24 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		game.var_player_train_state.ModelIndex = append(game.var_player_train_state.ModelIndex, oppo_hero_unit.GetModelIndex())
 	}
 
-	// if game.Secured {
-	// 	game.var_player_train_state.SelfWin = 0
-	// } else
-	if !all_self_heroes_dead && all_oppo_heroes_dead {
-		game.var_player_train_state.SelfWin = 1
-	} else if all_self_heroes_dead && !all_oppo_heroes_dead {
-		game.var_player_train_state.SelfWin = -1
-	} else if all_self_heroes_dead && all_oppo_heroes_dead {
-		game.var_player_train_state.SelfWin = 2
+	if game.Secured {
+		game.var_player_train_state.SelfWin = -(game.var_player_train_state.CampCTF*2 - 1)
 	} else {
-		game.var_player_train_state.SelfWin = 0
+		if !all_self_heroes_dead && all_oppo_heroes_dead {
+			game.var_player_train_state.SelfWin = 1
+		} else if all_self_heroes_dead && !all_oppo_heroes_dead {
+			game.var_player_train_state.SelfWin = -1
+		} else if all_self_heroes_dead && all_oppo_heroes_dead {
+			game.var_player_train_state.SelfWin = 2
+		} else {
+			game.var_player_train_state.SelfWin = 0
+		}
+	}
+
+	if game.TimeInitSecuring != -1 {
+		game.var_player_train_state.Securing = 1
+	} else {
+		game.var_player_train_state.Securing = 0
 	}
 
 	e, err := json.Marshal(game.var_player_train_state)
@@ -613,7 +646,8 @@ func (game *Game) Tick(gap_time float64) {
 		}
 	}
 
-	if game.isSecuring != 0 {
+	if game.isSecuring == uint8(game.var_player_train_state.CampCTF)+1 {
+		//if CampCTF == 0, namely vi's gonna ctf, isSecuring should be 1 when doing so, and vise versa
 		if game.TimeInitSecuring == -1 {
 			game.TimeInitSecuring = game.LogicTime
 			LogStr(fmt.Sprintf("Init Time: %v", game.TimeInitSecuring))
@@ -782,7 +816,7 @@ func (game *Game) HandleEnemyAICommand() {
 	game_state := game.GetGameState(true)
 	depth_map := hero.(BaseFunc).ViewDepth()
 
-	action_type := hero.(*Lusian).model.SampleAction(game_state, depth_map)
+	action_type := hero.(*Lusian).model.SampleAction(game_state, depth_map, -(game.var_player_train_state.CampCTF - 1))
 	game.HandleMultiPlayerAction(0, false, action_type[0], action_type[1], 0) // bug
 	game.HandleMultiPlayerVision(0, false, action_type[2], action_type[3])    // bug
 }

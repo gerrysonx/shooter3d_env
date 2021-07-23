@@ -18,13 +18,15 @@ func (hero *Vi) HandleAICommand(gap_time float64) {
 	targetPos[2] = pos[2]
 
 	//Check if the hero is in Flag area
-	if CheckWithinFlagArea(&GameInst, &pos) {
-		LogStr(fmt.Sprintf("Securing"))
-		GameInst.isSecuring = 1
+	if GameInst.var_player_train_state.CampCTF == 0 {
+		if CheckWithinFlagArea(&GameInst, &pos) {
+			LogStr(fmt.Sprintf("Securing"))
+			GameInst.isSecuring += 1
+		}
 	}
 
 	if GameInst.TimeInitSecuring != -1 {
-		return
+		//return
 	}
 
 	dist2tar := vec3.Distance(&pos, &targetPos)

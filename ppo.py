@@ -28,7 +28,7 @@ STATE_SIZE = 0
 
 #ONE_HERO_FEATURE_SIZE = 5
 SELF_HERO_FEATURE_SIZE = 7
-OPPO_HERO_FEATURE_SIZE = 7
+OPPO_HERO_FEATURE_SIZE = 7 + 1 # 1 for CampCTF(capture the flag), 1 for whether the flag is being secured
 
 EMBED_SIZE = 5
 LAYER_SIZE = 128
@@ -47,13 +47,13 @@ BATCH_SCALE = 8
 BATCH_SIZE = 64 * BATCH_SCALE
 EPOCH_NUM = 4
 LEARNING_RATE = 8e-4
-TIMESTEPS_PER_ACTOR_BATCH = 8192*2  #2048 * BATCH_SCALE
+TIMESTEPS_PER_ACTOR_BATCH = 8192//8 #*2  #2048 * BATCH_SCALE
 GAMMA = 0.99
 LAMBDA = 0.95
 NUM_STEPS = 5000
 ENV_NAME = 'gym_valorant:valorant-multiplayer-v0'
 RANDOM_START_STEPS = 4
-STEP_LIMIT=300
+STEP_LIMIT=600
 
 g_step = 0
 
@@ -118,34 +118,40 @@ class Environment(object):
     self.env = gym.make(ENV_NAME)
     self._screen = None
     self._depth = None
+    self._camp = None
 
     self.reward = 0
     self.terminal = True
     self.random_start = RANDOM_START_STEPS
     self.obs = np.zeros(shape=(HERO_COUNT, STATE_SIZE, C), dtype=np.float)
     self.depths = np.zeros(shape=(1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE, C), dtype=np.float)
+    self.camps = np.zeros(shape=(1, 1, C), dtype=np.float)
 
   def get_action_space(self):
     return self.env.action_space
 
   def step(self, action):
     _state, self.reward, self.terminal, info, rate_info = self.env.step(action)
-    self._screen, self._depth = _state[0], _state[1]
+    self._screen, self._depth, self._camp = _state[0], _state[1], _state[2]
     self.obs[..., :-1] = self.obs[..., 1:]
     self.obs[..., -1] = self._screen
 
     self.depths[..., :-1] = self.depths[..., 1:]
     self.depths[..., -1] = self._depth   
-    return [self.obs, self.depths], self.reward, self.terminal, info, rate_info
+
+    self.camps[..., :-1] = self.camps[..., 1:]
+    self.camps[..., -1] = self._camp   
+    return [self.obs, self.depths, self.camps], self.reward, self.terminal, info, rate_info
 
   def reset(self):
     _state = self.env.reset()
-    self._screen, self._depth = _state[0], _state[1]
+    self._screen, self._depth, self._camp = _state[0], _state[1], _state[2]
     for idx in range(C):
         self.obs[..., idx] = self._screen
         self.depths[..., idx] = self._depth
+        self.camps[..., idx] = self._camp  
 
-    return [self.obs, self.depths]
+    return [self.obs, self.depths, self.camps]
 
 
 class MultiPlayer_Data_Generator():
@@ -166,7 +172,7 @@ class MultiPlayer_Data_Generator():
 
         new = True # marks if we're on first timestep of an episode
         env_state = self.env.reset()
-        ob, depth = env_state[0], env_state[1]
+        ob, depth, camp = env_state[0], env_state[1], env_state[2]
 
         cur_ep_ret = 0 # return in current episode
         cur_ep_unclipped_ret = 0 # unclipped return in current episode
@@ -180,6 +186,7 @@ class MultiPlayer_Data_Generator():
         # Initialize history arrays
         obs = np.array([np.zeros(shape=(HERO_COUNT, STATE_SIZE, C), dtype=np.float32) for _ in range(horizon)])
         depths = np.array([np.zeros(shape=(1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE, C), dtype=np.float32) for _ in range(horizon)])
+        camps = np.array([np.zeros(shape=(1, 1, C), dtype=np.float32) for _ in range(horizon)])
         rews = np.zeros(horizon, 'float32')
         unclipped_rews = np.zeros(horizon, 'float32')
         vpreds = np.zeros(horizon, 'float32')
@@ -189,7 +196,7 @@ class MultiPlayer_Data_Generator():
 
         while True:
             prevac = ac
-            ac, vpred = self.agent.predict(ob[np.newaxis, ...], depth[np.newaxis, ...])
+            ac, vpred = self.agent.predict(ob[np.newaxis, ...], depth[np.newaxis, ...], camp[np.newaxis, ...])
             #print('Action:', ac, 'Value:', vpred)
             # Slight weirdness here because we need value function at time T
             # before returning segment [0, T-1] so we get the correct
@@ -199,7 +206,7 @@ class MultiPlayer_Data_Generator():
                         "ac" : acs, "prevac" : prevacs, "nextvpred": vpred * (1 - new),
                         "ep_rets" : ep_rets, "ep_lens" : ep_lens,
                         "ep_unclipped_rets": ep_unclipped_rets, "depth": depths,
-                        "model_idx": model_idx, "wins": wins}
+                        "model_idx": model_idx, "wins": wins, "camps": camps}
                 # Be careful!!! if you change the downstream algorithm to aggregate
                 # several of these batches, then be sure to do a deepcopy
                 ep_rets = []
@@ -211,6 +218,7 @@ class MultiPlayer_Data_Generator():
             i = t % horizon
             obs[i] = ob
             depths[i] = depth
+            camps[i] = camp
 
             vpreds[i] = vpred
             news[i] = new
@@ -329,10 +337,14 @@ class MultiPlayerAgent():
 
     def _init_input(self, *args):
         with tf.variable_scope('input'):
+            #Observation state
             self.multi_s = tf.placeholder(tf.float32, [None, HERO_COUNT, self.input_dims, C], name='multi_s')
 
             # Depth map
             self.multi_d = tf.placeholder(tf.float32, [None, HERO_COUNT, self.depth_map_size * self.depth_map_size, C], name='multi_d')
+
+            # camp
+            self.multi_c = tf.placeholder(tf.int32, [None, 1, 1, C], name='multi_c')
 
             # Action shall have 2 elements, 
             self.multi_a = tf.placeholder(tf.int32, [None, HERO_COUNT, self.policy_head_num], name='multi_a')
@@ -344,6 +356,7 @@ class MultiPlayerAgent():
             if g_histo_enabled:
                 tf.summary.histogram("input_state", self.multi_s)
                 tf.summary.histogram("input_depth_map", self.multi_d)
+                tf.summary.histogram("input_camp", self.multi_c)
                 tf.summary.histogram("input_action", self.multi_a)
                 tf.summary.histogram("input_cumulative_r", self.cumulative_r)
                 tf.summary.histogram("input_adv", self.adv)
@@ -445,9 +458,10 @@ class MultiPlayerAgent():
                 input_pl = self.multi_s[:,actor_idx,:,:]
 
                 # Now there is only one hero, so we force hero id as 0
-                input_depth = self.multi_d[:,0,:]
+                input_depth = self.multi_d[:,0,:,:]
+                input_camp = self.multi_c[:,0,:,:]
                 # Share weights
-                a_prob_arr, a_logits_arr, value = self._init_single_actor_net(scope, input_pl, input_depth, trainable)
+                a_prob_arr, a_logits_arr, value = self._init_single_actor_net(scope, input_pl, input_depth, input_camp, trainable)
                 a_prob_arr_arr.append(a_prob_arr)
                 a_logits_arr_arr.append(a_logits_arr)
                 value_arr.append(value)
@@ -456,17 +470,15 @@ class MultiPlayerAgent():
             return a_prob_arr_arr, a_logits_arr_arr, value_arr, merged_summary
         pass
 
-    def _init_single_actor_net(self, scope, input_pl, input_depth, trainable=True):        
+    def _init_single_actor_net(self, scope, input_pl, input_depth, input_camp, trainable=True):        
         my_initializer = tf.contrib.layers.xavier_initializer()
         with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             if trainable and g_histo_enabled:
                 tf.summary.histogram("hidde input:", input_pl)
-                
-            flat_output_size = STATE_SIZE*C
-            flat_output = tf.reshape(input_pl, [-1, flat_output_size], name='flat_state_input')
 
             square_depth_input = tf.reshape(input_depth, [-1, self.depth_map_size, self.depth_map_size, 1], name='square_depth_input')
 
+            #Depth Map CNN Part
             conv_channel_count = 4
             down_sample_ratio = 4
             depth_cnn_w_1 = tf.get_variable("depth_cnn_w_1", [3, 3, 1, conv_channel_count], initializer=my_initializer)
@@ -479,8 +491,6 @@ class MultiPlayerAgent():
                 padding='SAME'), 
                 depth_cnn_b_1))
 
-
-            
             conv_channel_count2 = 8
             down_sample_ratio2 = 2
             depth_cnn_w_2 = tf.get_variable("depth_cnn_w_2", [3, 3, conv_channel_count, conv_channel_count2], initializer=my_initializer)
@@ -492,12 +502,19 @@ class MultiPlayerAgent():
                 strides=[1, down_sample_ratio2, down_sample_ratio2, 1], 
                 padding='SAME'), 
                 depth_cnn_b_2))
-
-            
                 
             # Flat conv output
             conv_flat_dim = int(conv_channel_count2 * (self.depth_map_size / down_sample_ratio / down_sample_ratio2)**2)
             flat_conv_output = tf.reshape(depth_map_embedding, [-1, conv_flat_dim], name='flat_conv_output')
+
+            #Camp Embedding Part
+            camp_embedding_size = 128
+            camp_embedding_w = tf.get_variable('camp_embedding_w', [2, camp_embedding_size], initializer=my_initializer)
+            camp_embedding_output = tf.reshape(tf.nn.embedding_lookup(camp_embedding_w, input_camp), [-1, camp_embedding_size])
+
+            #Observation Part
+            flat_output_size = STATE_SIZE*C
+            flat_output = tf.reshape(input_pl, [-1, flat_output_size], name='flat_state_input')
 
             # Add hero one-hot vector embedding
             if g_embed_hero_id:
@@ -534,9 +551,9 @@ class MultiPlayerAgent():
 
                 output1 = tf.nn.relu(tf.matmul(flat_output, fc_W_1) + fc_b_1)                
 
-            # Concat the output1 with depth embedding
-            concat_output_dim = conv_flat_dim + self.layer_size
-            concat_output = tf.concat([output1, flat_conv_output], axis = -1)
+            # Main NN Structure
+            concat_output_dim = conv_flat_dim + self.layer_size + camp_embedding_size
+            concat_output = tf.concat([output1, flat_conv_output, camp_embedding_output], axis = -1)
 
 
             fc_W_2 = tf.get_variable(shape=[concat_output_dim, self.layer_size], name='fc_W_2',
@@ -615,7 +632,7 @@ class MultiPlayerAgent():
             
             return a_prob_arr, a_logits_arr, value
 
-    def predict(self, s, depth):
+    def predict(self, s, depth, c):
         # Calculate a eval prob.
         action_arr = []
         value_arr = []
@@ -623,7 +640,7 @@ class MultiPlayerAgent():
         for hero_idx in range(HERO_COUNT):
             tuple_val = self.session.run([self.value[hero_idx], self.a_policy_new[hero_idx][0], self.a_policy_new[hero_idx][1],\
                                 self.a_policy_new[hero_idx][2], self.a_policy_new[hero_idx][3], self.a_policy_new[hero_idx][4]], 
-            feed_dict={self.multi_s: s, self.multi_d: depth})
+            feed_dict={self.multi_s: s, self.multi_d: depth, self.multi_c: c})
             value = tuple_val[0]
             chosen_policy = tuple_val[1:]
             #chosen_policy = self.session.run(self.a_policy_new, feed_dict={self.s: s})
@@ -716,6 +733,7 @@ class MultiPlayerAgent():
     def learn_one_traj(self, timestep, seg):
         lens, rets, unclipped_rets = np.array(seg["ep_lens"]), np.array(seg["ep_rets"]), np.array(seg["ep_unclipped_rets"])
         ob, ac, atarg, tdlamret, depth = np.array(seg["ob"]), np.array(seg["ac"]), np.array(seg["std_atvtg"]), np.array(seg["tdlamret"]), np.array(seg['depth'])
+        camp = np.array(seg["camps"])
         #print("reward: ", rets)
         self.session.run(self.update_policy_net_op)
 
@@ -742,6 +760,7 @@ class MultiPlayerAgent():
                     self.multi_s: ob[temp_indices],
                     self.multi_a: ac[temp_indices],
                     self.multi_d: depth[temp_indices],
+                    self.multi_c: camp[temp_indices],
                     self.cumulative_r: tdlamret[temp_indices],
                 })
 
@@ -855,7 +874,7 @@ def learn(scene_id, num_steps=NUM_STEPS):
                 idx = str(int(model_info_t['Model'][-1]) + 1).zfill(4)
                 tf.saved_model.simple_save(session,
                         "./model/model_{}".format(idx),
-                        inputs={"input_state":agent.multi_s, "input_depth":agent.multi_d},
+                        inputs={"input_state":agent.multi_s, "input_depth":agent.multi_d, "input_camp":agent.multi_c},
                         outputs={"output_policy_0": agent.a_policy_new[0][0], "output_policy_1": agent.a_policy_new[0][1], "output_policy_2": agent.a_policy_new[0][2], 
                         "output_policy_3": agent.a_policy_new[0][3], "output_policy_4": agent.a_policy_new[0][4], 
                         "output_value":agent.value[0]}) 

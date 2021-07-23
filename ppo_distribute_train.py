@@ -91,11 +91,11 @@ def log_out(str_log):
 
 def get_one_step_data(timestep, work_thread_count):
     root_folder = os.path.split(os.path.abspath(__file__))[0]
-    ob, ac, std_atvtg, tdlamret, lens, rets, unclipped_rets, news, depth, hidden_states, model_idx, wins = [], [], [], [], [], [], [], [], [], [], [], []
+    ob, ac, std_atvtg, tdlamret, lens, rets, unclipped_rets, news, depth, hidden_states, model_idx, wins, camps = [], [], [], [], [], [], [], [], [], [], [], [], []
 
     data_folder_path = '{}/../distribute_collected_train_data'.format(root_folder)
     i = 0
-    while i < 25:
+    while i < 15:
         for root, _, files in os.walk(data_folder_path):
             for file_name in files:
                 full_file_name = '{}/{}'.format(root, file_name)
@@ -119,6 +119,7 @@ def get_one_step_data(timestep, work_thread_count):
                     depth.extend(_seg["depth"])
                     model_idx.extend(_seg["model_idx"])
                     wins.extend(_seg["wins"])
+                    camps.extend(_seg["camps"])
                     if 'hidden_states' in _seg:
                         hidden_states.extend(_seg["hidden_states"])
                 os.remove(full_file_name)
@@ -141,6 +142,7 @@ def get_one_step_data(timestep, work_thread_count):
     seg['depth'] =  np.array(depth)
     seg["model_idx"] = np.array(model_idx)
     seg["wins"] = np.array(wins)
+    seg["camps"] = np.array(camps)
     return seg
 
 
@@ -183,7 +185,7 @@ def learn(scene_id, num_steps):
                 idx = str(int(model_info_t['Model'][-1]) + 1).zfill(4)
                 tf.saved_model.simple_save(session,
                         "./model/model_{}".format(idx),
-                        inputs={"input_state":agent.multi_s, "input_depth":agent.multi_d},
+                        inputs={"input_state":agent.multi_s, "input_depth":agent.multi_d, "input_camp":agent.multi_c},
                         outputs={"output_policy_0": agent.a_policy_new[0][0], "output_policy_1": agent.a_policy_new[0][1], "output_policy_2": agent.a_policy_new[0][2], 
                         "output_policy_3": agent.a_policy_new[0][3], "output_policy_4": agent.a_policy_new[0][4], 
                         "output_value":agent.value[0]}) 
