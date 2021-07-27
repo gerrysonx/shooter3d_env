@@ -1,6 +1,0 @@
-README.md
-setup.py
-gym_valorant.egg-info/PKG-INFO
-gym_valorant.egg-info/SOURCES.txt
-gym_valorant.egg-info/dependency_links.txt
-gym_valorant.egg-info/top_level.txt
