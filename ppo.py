@@ -76,7 +76,7 @@ g_enable_per = False
 g_per_alpha = 0.6
 g_is_beta_start = 0.4
 g_is_beta_end = 1
-g_histo_enabled = True
+g_histo_enabled = False
 
 def scalar_summary(summary_writer, tag_val, values, step):
     summary0 = tf.Summary()
@@ -186,7 +186,7 @@ class MultiPlayer_Data_Generator():
         # Initialize history arrays
         obs = np.array([np.zeros(shape=(HERO_COUNT, STATE_SIZE, C), dtype=np.float32) for _ in range(horizon)])
         depths = np.array([np.zeros(shape=(1, DEPTH_MAP_SIZE * DEPTH_MAP_SIZE, C), dtype=np.float32) for _ in range(horizon)])
-        camps = np.array([np.zeros(shape=(HERO_COUNT, 1, C), dtype=np.float32) for _ in range(horizon)])
+        camps = np.array([np.zeros(shape=(1, 1, C), dtype=np.float32) for _ in range(horizon)])
         rews = np.zeros(horizon, 'float32')
         unclipped_rews = np.zeros(horizon, 'float32')
         vpreds = np.zeros(horizon, 'float32')
@@ -433,12 +433,13 @@ class MultiPlayerAgent():
             self.policy_entropy = tf.reduce_mean(self.policy_entropy_arr)
 
         with tf.variable_scope('optimizer'):
+            entropy_weight = tf.clip_by_value(0.4 * self.lrmult - 0.2, 0.005, 0.2)
             if g_enable_per:          
-                self.total_loss_arr = -self.a_loss_func_arr + self.c_loss_func_arr - 0.05*self.policy_entropy_arr
+                self.total_loss_arr = -self.a_loss_func_arr + self.c_loss_func_arr - entropy_weight*self.policy_entropy_arr
                 self.total_loss_arr = tf.multiply(self.total_loss_arr, self.importance_sample_arr_pl)
                 self.total_loss = tf.reduce_mean(self.total_loss_arr)
             else:
-                self.total_loss = self.a_loss_func + self.c_loss_func - 0.05*self.policy_entropy 
+                self.total_loss = self.a_loss_func + self.c_loss_func - entropy_weight*self.policy_entropy 
             '''
             self.total_loss_arr = self.a_loss_func_arr + self.c_loss_func_arr - 0.01*self.policy_entropy_arr
             self.total_loss = self.a_loss_func + self.c_loss_func - 0.01*self.policy_entropy 
@@ -509,7 +510,7 @@ class MultiPlayerAgent():
             flat_conv_output = tf.reshape(depth_map_embedding, [-1, conv_flat_dim], name='flat_conv_output')
 
             #Camp Embedding Part
-            camp_embedding_size = 128
+            camp_embedding_size = self.layer_size
             camp_embedding_w = tf.get_variable('camp_embedding_w', [2, camp_embedding_size], initializer=my_initializer)
             camp_embedding_output = tf.reshape(tf.nn.embedding_lookup(camp_embedding_w, input_camp), [-1, camp_embedding_size])
 
@@ -553,9 +554,8 @@ class MultiPlayerAgent():
                 output1 = tf.nn.relu(tf.matmul(flat_output, fc_W_1) + fc_b_1)                
 
             # Main NN Structure
-            concat_output_dim = conv_flat_dim + self.layer_size + camp_embedding_size
-            concat_output = tf.concat([output1, flat_conv_output, camp_embedding_output], axis = -1)
-
+            concat_output_dim = conv_flat_dim + self.layer_size
+            concat_output = tf.concat([tf.multiply(output1, camp_embedding_output), flat_conv_output], axis = -1)
 
             fc_W_2 = tf.get_variable(shape=[concat_output_dim, self.layer_size], name='fc_W_2',
                 trainable=trainable, initializer=my_initializer)
@@ -782,16 +782,15 @@ class MultiPlayerAgent():
                 c_loss_list.append(c_loss)
                 a_loss_list.append(a_loss)
 
-        if g_histo_enabled:
-            self.train_writer.add_summary(summary_new_val, timestep)
-            self.train_writer.add_summary(summary_old_val, timestep)
+        # self.train_writer.add_summary(summary_new_val, timestep)
+        # self.train_writer.add_summary(summary_old_val, timestep)
 
-            scalar_summary(self.train_writer, 'c_loss_raw', c_loss_list, timestep)
-            scalar_summary(self.train_writer, 'a_loss_raw', a_loss_list, timestep)
-            scalar_summary(self.train_writer, 'a_entropy_raw', Entropy_list, timestep)
+        # scalar_summary(self.train_writer, 'c_loss_raw', c_loss_list, timestep)
+        # scalar_summary(self.train_writer, 'a_loss_raw', a_loss_list, timestep)
+        # scalar_summary(self.train_writer, 'a_entropy_raw', Entropy_list, timestep)
 
-            histo_summary(self.train_writer, 'tdlamret_raw', tdlamret, timestep)
-            histo_summary(self.train_writer, 'atarg_raw', atarg, timestep)
+        # histo_summary(self.train_writer, 'tdlamret_raw', tdlamret, timestep)
+        # histo_summary(self.train_writer, 'atarg_raw', atarg, timestep)
 
         self.lenbuffer.extend(lens)
         self.rewbuffer.extend(rets)
@@ -884,7 +883,7 @@ def learn(scene_id, num_steps=NUM_STEPS):
         seg = data_generator.get_one_step_data()
 
         if ((sum(seg['wins']) / len(seg['wins'])) + 1) / 2 > EloHelper.updateThreshold:
-            score, model_info_t = EloHelper.getEloScore(seg['model_idx'], seg['wins'])
+            score, model_info_t = EloHelper.EloHelper.getEloScore(seg['model_idx'], seg['wins'])
             if g_save_pb_model:
                 idx = str(int(model_info_t['Model'][-1]) + 1).zfill(4)
                 tf.saved_model.simple_save(session,
@@ -896,7 +895,7 @@ def learn(scene_id, num_steps=NUM_STEPS):
                 saver.save(session,'ckpt/model_{}/mnist.ckpt'.format(idx), global_step=g_step)
                 model_info_t["Model"].append(idx)
                 model_info_t["Score"].append(int(round(score)))
-                EloHelper.writeModelList(model_info_t)
+                EloHelper.EloHelper.writeModelList(model_info_t)
 
 
         entropy, kl_distance = agent.learn_one_traj(timestep, seg)

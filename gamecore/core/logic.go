@@ -83,7 +83,7 @@ type GameVarPlayerTrainState struct {
 
 	CampCTF int32
 
-	Securing int32
+	Securing float32
 }
 
 type Game struct {
@@ -595,12 +595,6 @@ func (game *Game) DumpVarPlayerGameState() []byte {
 		}
 	}
 
-	if game.TimeInitSecuring != -1 {
-		game.var_player_train_state.Securing = 1
-	} else {
-		game.var_player_train_state.Securing = 0
-	}
-
 	e, err := json.Marshal(game.var_player_train_state)
 	/*
 		var unmarshaled_gamestate GameVarPlayerTrainState
@@ -654,9 +648,12 @@ func (game *Game) Tick(gap_time float64) {
 		} else if game.TimeInitSecuring+game.Time2Secure < game.LogicTime {
 			game.Secured = true
 			LogStr("Secured!")
+		} else {
+			game.var_player_train_state.Securing = float32((game.LogicTime - game.TimeInitSecuring) / game.Time2Secure)
 		}
 	} else {
 		game.TimeInitSecuring = -1
+		game.var_player_train_state.Securing = 0
 	}
 	temp_arr2 = append(temp_arr2, game.skill_targets_add...)
 	game.skill_targets_add = []SkillTarget{}

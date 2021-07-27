@@ -257,4 +257,4 @@ if __name__=='__main__':
     my_env['moba_env_scene_id'] = '{}'.format(scene_id)
 
     init()
-    learn(scene_id, num_steps=50000)
+    learn(scene_id, num_steps=1000)

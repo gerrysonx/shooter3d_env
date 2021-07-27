@@ -7,6 +7,7 @@ import numpy as np
 import copy
 from gym import error, spaces, utils
 from gym.utils import seeding
+from DistHelper import DistanceHelper
 
 #ONE_HERO_FEATURE_SIZE = 5
 SELF_HERO_FEATURE_SIZE = 7
@@ -100,7 +101,7 @@ class ValorantMultiPlayerEnv(gym.Env):
         self.reward = 0
         self.info = ValorantEnvInfo()
         self.last_state = None
-        self.step_idx = 0                
+        self.step_idx = 0  
         pass
 
     def __init__(self):
@@ -343,7 +344,7 @@ class ValorantMultiPlayerEnv(gym.Env):
                 if jobj['SelfWin'] != 0:
                     self.done = True
                     if jobj['SelfWin'] == 2:
-                        self.reward = 0
+                        self.reward = -0.1
                     elif jobj['SelfWin'] == -1:
                         self.reward = -1
                     elif jobj['SelfWin'] == 1:
@@ -358,13 +359,24 @@ class ValorantMultiPlayerEnv(gym.Env):
                     self.reward = 0
                     self.reward += self.get_harm_reward()
                     self.reward += TIME_PENALTY
+                    # if AI is in the camp of CTF, then give it a small positive reward when in the secure zone
+                    if jobj['CampCTF'] == 0: 
+                        securing_reward = (self.state[0][14] - self.last_state[0][14]) * 0.5
+                        self.reward += securing_reward
                     # self.reward += self.get_height_reward()
-
+                    # gives AI a reward towards the flags
+                        dist_reward = 0.2 * (DistanceHelper.findMinDist((self.state[0][0], self.state[0][1])) - \
+                                DistanceHelper.findMinDist((self.last_state[0][0], self.last_state[0][1])))
+                        self.reward -= dist_reward
+                        dist = 0.4 * (np.sqrt(np.sum(np.square([self.state[0][0] - self.state[0][7], self.state[0][1] - self.state[0][8]]))) - \
+                                np.sqrt(np.sum(np.square([self.last_state[0][0] - self.last_state[0][7], self.last_state[0][1] - self.last_state[0][8]]))))
+                        self.reward += dist
                     self.done = False
                 
 
                 break
-            except:
+            except Exception as e:
+                print(e)
                 print('Parsing json failed, terminate this game.')
                 self.done = True
                 self.reward = 0

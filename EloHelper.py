@@ -7,7 +7,7 @@ class EloHelper:
     eloScoreBase = 1000
     eloIncrementStep = 16
     modelPath = "./model"
-    updateThreshold = 0.6
+    updateThreshold = 0.675
 
 
     @staticmethod
